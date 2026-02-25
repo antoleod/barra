@@ -216,6 +216,7 @@
         <div class="batch-label">
             <span>Batch Mode</span>
             <label class="switch"><input type="checkbox" id="batch-toggle" onchange="app.toggleBatchMode()"><span class="slider"></span></label>
+            <span id="batch-counter" class="badge badge-sent" style="display:none; margin-left:8px; font-size:0.9rem;">0</span>
         </div>
         <select id="batch-layout" class="batch-select" onchange="app.setBatchLayout(this.value)" disabled>
             <option value="QWERTY">QWERTY</option>
@@ -458,6 +459,7 @@
             filter: 'all',
             scanner: null,
             batchMode: false,
+            batchCount: 0,
             batchLayout: 'QWERTY',
             laserSound: new Audio("https://assets.mixkit.co/active_storage/sfx/600/600-preview.mp3"),
 
@@ -497,6 +499,15 @@
             toggleBatchMode() {
                 this.batchMode = document.getElementById('batch-toggle').checked;
                 document.getElementById('batch-layout').disabled = !this.batchMode;
+                
+                const counter = document.getElementById('batch-counter');
+                if (this.batchMode) {
+                    this.batchCount = 0;
+                    counter.innerText = '0';
+                    counter.style.display = 'inline-block';
+                } else {
+                    counter.style.display = 'none';
+                }
             },
 
             setBatchLayout(layout) {
@@ -597,6 +608,8 @@
                 if (this.batchMode) {
                     this.tempScan = finalCode;
                     this.confirmScan(this.batchLayout);
+                    this.batchCount++;
+                    document.getElementById('batch-counter').innerText = this.batchCount;
                     return;
                 }
 
