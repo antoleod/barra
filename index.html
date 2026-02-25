@@ -50,7 +50,8 @@
         }
         .log-header { padding: 15px; background: #252525; border-bottom: 1px solid #333; font-weight: 600; position: sticky; top: 0; }
         #log-content { padding: 0; list-style: none; margin: 0; }
-        .log-item { padding: 12px 15px; border-bottom: 1px solid #333; display: flex; align-items: center; font-size: 0.95rem; animation: slideIn 0.3s ease-out; }
+        .log-item { padding: 12px 15px; border-bottom: 1px solid #333; display: flex; align-items: center; font-size: 0.95rem; animation: slideIn 0.3s ease-out; cursor: pointer; transition: background 0.2s; }
+        .log-item:hover { background: #2a2a2a; }
         @keyframes slideIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
         .success { color: #66bb6a; font-weight: 600; margin-right: 8px; }
         .error { color: #ef5350; font-weight: 600; margin-right: 8px; }
@@ -86,6 +87,16 @@
         .btn-close:hover { background-color: #666; }
         .btn-success { background-color: #2e7d32; color: white; }
         .btn-success:hover { background-color: #1b5e20; }
+        
+        /* Scanner Laser Theme */
+        #reader__scan_region { position: relative; overflow: hidden; }
+        #reader__scan_region::after {
+            content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; background: #66bb6a; box-shadow: 0 0 4px #66bb6a;
+            animation: scanLaser 2s infinite linear; opacity: 0.6;
+        }
+        @keyframes scanLaser {
+            0% { top: 0; } 50% { top: 100%; } 100% { top: 0; }
+        }
 
     </style>
 </head>
@@ -97,6 +108,7 @@
     </div>
 
     <div id="reader"></div>
+    <div id="reader-error" style="color: #ef5350; margin-top: 15px; font-weight: 600; display: none; max-width: 400px; text-align: center;"></div>
     
     <div class="log-container" id="history">
         <div class="log-header">Historial: <span id="scan-count">0</span></div>
@@ -128,6 +140,19 @@
         </div>
     </div>
 
+    <!-- Modal de Edición -->
+    <div id="edit-modal" class="modal-overlay">
+        <div class="modal-content">
+            <h3>Editar Registro</h3>
+            <input type="text" id="edit-input" style="width: 100%; padding: 12px; margin: 15px 0; background: #333; border: 1px solid #555; color: white; border-radius: 8px; box-sizing: border-box; font-size: 1rem;">
+            <div style="display: flex; gap: 10px; margin-top: 5px;">
+                <button id="save-edit-btn" class="btn btn-success" style="margin-top:0;">Guardar</button>
+                <button id="delete-item-btn" class="btn btn-danger" style="margin-top:0;">Eliminar</button>
+            </div>
+            <button id="close-edit-btn" class="btn btn-close">Cancelar</button>
+        </div>
+    </div>
+
     <script>
         // 1. Sonido de éxito (Beep)
         const beep = new Audio("https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3");
@@ -137,18 +162,33 @@
         // 2. Base de datos temporal en el móvil
         let scannedHistory = [];
         let settings = {};
+        let currentEditIndex = -1;
 
         const log = document.getElementById('log-content');
         const settingsModal = document.getElementById('settings-modal');
+        const editModal = document.getElementById('edit-modal');
+        const editInput = document.getElementById('edit-input');
         const soundToggle = document.getElementById('sound-toggle');
         const vibrationToggle = document.getElementById('vibration-toggle');
         const scanCountElement = document.getElementById('scan-count');
 
-        function addLogItem(message, type) {
-            const item = document.createElement('li');
-            item.className = 'log-item';
-            item.innerHTML = `<span class="${type}">[${type === 'success' ? '✔' : 'X'}] ${type.toUpperCase()}:</span> ${message}`;
-            log.prepend(item);
+        // Renderizado completo del historial
+        function renderHistory() {
+            log.innerHTML = '';
+            // Iteramos en reverso para mostrar el más reciente arriba
+            scannedHistory.slice().reverse().forEach((code, reversedIndex) => {
+                // Calculamos el índice real en el array original
+                const realIndex = scannedHistory.length - 1 - reversedIndex;
+                
+                const item = document.createElement('li');
+                item.className = 'log-item';
+                item.innerHTML = `<span class="success">[✔] REGISTRADO:</span> ${code}`;
+                
+                // Evento para editar/eliminar
+                item.onclick = () => openEditModal(realIndex);
+                log.appendChild(item);
+            });
+            updateCount();
         }
 
         function updateCount() {
@@ -177,7 +217,11 @@
             // 4. Validación de formato (Seguridad)
             // Filtramos para que solo acepte códigos con formato alfanumérico largo
             if(decodedText.length < 5) {
-                addLogItem('Código muy corto', 'error');
+                // Mostramos error temporalmente en la lista (sin guardar en historial)
+                const item = document.createElement('li');
+                item.className = 'log-item';
+                item.innerHTML = `<span class="error">[X] ERROR:</span> Código muy corto`;
+                log.prepend(item);
                 return;
             }
 
@@ -186,8 +230,7 @@
             scannedHistory.push(decodedText);
             localStorage.setItem('asset_history', JSON.stringify(scannedHistory));
             
-            addLogItem(decodedText, 'success');
-            updateCount();
+            renderHistory();
             
             // Vibración táctil (exclusivo para móviles como tu S24)
             if (settings.vibration && navigator.vibrate) navigator.vibrate(100);
@@ -211,18 +254,43 @@
 
         function loadHistory() {
             scannedHistory = JSON.parse(localStorage.getItem('asset_history')) || [];
-            log.innerHTML = ''; // Limpiar vista
-            scannedHistory.forEach(code => addLogItem(code, 'success'));
-            updateCount();
+            renderHistory();
         }
 
         function clearHistory() {
             if (confirm('¿Estás seguro de que quieres borrar todo el historial? Esta acción no se puede deshacer.')) {
                 scannedHistory = [];
                 localStorage.removeItem('asset_history');
-                log.innerHTML = '';
-                updateCount();
+                renderHistory();
                 settingsModal.style.display = 'none';
+            }
+        }
+
+        // --- Funciones de Edición ---
+        function openEditModal(index) {
+            currentEditIndex = index;
+            editInput.value = scannedHistory[index];
+            editModal.style.display = 'flex';
+        }
+
+        function saveEdit() {
+            if (currentEditIndex > -1) {
+                const newValue = editInput.value.trim();
+                if (newValue) {
+                    scannedHistory[currentEditIndex] = newValue;
+                    localStorage.setItem('asset_history', JSON.stringify(scannedHistory));
+                    renderHistory();
+                    editModal.style.display = 'none';
+                }
+            }
+        }
+
+        function deleteItem() {
+            if (currentEditIndex > -1 && confirm('¿Eliminar este registro?')) {
+                scannedHistory.splice(currentEditIndex, 1);
+                localStorage.setItem('asset_history', JSON.stringify(scannedHistory));
+                renderHistory();
+                editModal.style.display = 'none';
             }
         }
 
@@ -251,12 +319,21 @@
             const html5QrcodeScanner = new Html5QrcodeScanner(
                 "reader", { 
                 fps: 30, // Más rápido
-                qrbox: {width: 300, height: 200}, // Caja de escaneo más grande
-                videoConstraints: { facingMode: "environment" } // Prioriza cámara trasera
+                qrbox: {width: 300, height: 200},
+                // Usa 'ideal' para preferir la cámara trasera, pero permitir otras si no está disponible
+                videoConstraints: { 
+                    facingMode: { ideal: "environment" }
+                }
                 }, 
                 false // verbose
             );
-            html5QrcodeScanner.render(onScanSuccess);
+            
+            // Manejo de errores al iniciar la cámara
+            html5QrcodeScanner.render(onScanSuccess).catch(err => {
+                console.error(`ERROR AL INICIAR CÁMARA: ${err}`);
+                document.getElementById('reader-error').innerHTML = `<b>Error de Cámara:</b> No se pudo iniciar. <br>Por favor, otorga los permisos y asegúrate de que no esté en uso.`;
+                document.getElementById('reader-error').style.display = 'block';
+            });
 
             // Listeners para el modal de ajustes
             document.getElementById('settings-btn').addEventListener('click', () => {
@@ -267,6 +344,11 @@
             });
             document.getElementById('clear-history-btn').addEventListener('click', clearHistory);
             document.getElementById('export-csv-btn').addEventListener('click', exportToCSV);
+            
+            // Listeners para edición
+            document.getElementById('close-edit-btn').addEventListener('click', () => editModal.style.display = 'none');
+            document.getElementById('save-edit-btn').addEventListener('click', saveEdit);
+            document.getElementById('delete-item-btn').addEventListener('click', deleteItem);
 
             soundToggle.addEventListener('change', (e) => {
                 settings.sound = e.target.checked;
