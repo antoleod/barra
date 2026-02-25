@@ -123,6 +123,7 @@
             <h2>🛡️ Registro</h2>
         </div>
         <div style="display:flex; gap: 15px;">
+            <span class="settings-icon" id="pause-btn" title="Pausar Escáner">⏸️</span>
             <span class="settings-icon" id="trash-btn" title="Borrar Historial">🗑️</span>
             <span class="settings-icon" id="settings-btn">⚙️</span>
         </div>
@@ -215,6 +216,7 @@
         let currentEditIndex = -1;
         let tempScannedCode = "";
         let isProcessing = false;
+        let isPaused = false;
         let html5QrcodeScanner = null;
         // URL de la hoja para el botón "Abrir"
         const GOOGLE_SHEET_VIEW_URL = "https://docs.google.com/spreadsheets/d/1_VT_QFvuObqWvA-4vngm7u_KBhfIA1AmP-BOjzncJwY/edit?usp=sharing";
@@ -230,6 +232,7 @@
         const vibrationToggle = document.getElementById('vibration-toggle');
         const scanCountElement = document.getElementById('scan-count');
         const connectionStatusElement = document.getElementById('connection-status');
+        const pauseBtn = document.getElementById('pause-btn');
 
         // Renderizado completo del historial
         function renderHistory() {
@@ -403,6 +406,11 @@
                     const readerDiv = document.getElementById('reader');
                     readerDiv.innerHTML = '<div style="display:flex; justify-content:center; align-items:center; height:200px; background:#111;"><button id="resume-scan-btn" class="btn btn-success" style="width:auto; padding:15px 30px; font-size:1.1rem;">📷 Escanear Nuevo</button></div>';
                     document.getElementById('resume-scan-btn').addEventListener('click', startScanner);
+                    if(pauseBtn) {
+                        pauseBtn.textContent = "▶️";
+                        pauseBtn.title = "Reanudar Escáner";
+                    }
+                    isPaused = true;
                 }).catch(err => console.error("Error al detener escáner", err));
             }
 
@@ -573,6 +581,12 @@
                 );
             }
             
+            if(pauseBtn) {
+                pauseBtn.textContent = "⏸️";
+                pauseBtn.title = "Pausar Escáner";
+            }
+            isPaused = false;
+
             html5QrcodeScanner.render(onScanSuccess).catch(err => {
                 console.error(`ERROR AL INICIAR CÁMARA: ${err}`);
                 document.getElementById('reader-error').innerHTML = `<b>Error de Cámara:</b> No se pudo iniciar. <br>Por favor, otorga los permisos y asegúrate de que no esté en uso.`;
@@ -598,6 +612,25 @@
             // Nuevo botón de basura en header
             const trashBtn = document.getElementById('trash-btn');
             if(trashBtn) trashBtn.addEventListener('click', clearHistory);
+
+            // Botón de Pausa/Reanudar
+            if(pauseBtn) {
+                pauseBtn.addEventListener('click', () => {
+                    if (!html5QrcodeScanner) return;
+                    
+                    if (isPaused) {
+                        startScanner();
+                    } else {
+                        html5QrcodeScanner.clear().then(() => {
+                            const readerDiv = document.getElementById('reader');
+                            readerDiv.innerHTML = '<div style="display:flex; flex-direction:column; justify-content:center; align-items:center; height:200px; background:#000; color:#666;"><div style="font-size:2rem; margin-bottom:10px;">⏸️</div><div>Pausado</div></div>';
+                            pauseBtn.textContent = "▶️";
+                            pauseBtn.title = "Reanudar Escáner";
+                            isPaused = true;
+                        }).catch(err => console.error("Error al pausar:", err));
+                    }
+                });
+            }
 
             document.getElementById('export-csv-btn').addEventListener('click', exportToCSV);
             document.getElementById('export-json-btn').addEventListener('click', exportToJSON);
