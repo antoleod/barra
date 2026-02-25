@@ -2,66 +2,281 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>S24 Asset Security Scan</title>
     <script src="https://unpkg.com/html5-qrcode"></script>
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #1a1a1a; color: white; text-align: center; padding: 20px; }
-        #reader { width: 100%; max-width: 500px; border-radius: 20px; border: 2px solid #333; margin: auto; overflow: hidden; background: #000; }
-        .log-container { margin-top: 20px; background: #2d2d2d; padding: 15px; border-radius: 12px; text-align: left; max-height: 200px; overflow-y: auto; }
-        .success { color: #4caf50; font-weight: bold; }
-        .error { color: #f44336; font-weight: bold; }
-        .duplicate { color: #ff9800; font-weight: bold; }
+        body { 
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; 
+            background: #121212; 
+            color: #e0e0e0; 
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+        .header-container {
+            width: 100%;
+            max-width: 400px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        h2 { margin: 0; font-weight: 600; letter-spacing: 0.5px; color: #fff; }
+
+        #reader { 
+            width: 100%; 
+            max-width: 400px; 
+            border-radius: 16px; 
+            box-shadow: 0 4px 20px rgba(0,0,0,0.5); 
+            overflow: hidden; 
+            background: #000; 
+            border: none;
+        }
+        .log-container { 
+            width: 100%; 
+            max-width: 400px; 
+            margin-top: 24px; 
+            background: #1e1e1e; 
+            border-radius: 12px; 
+            text-align: left; 
+            max-height: 300px; 
+            overflow-y: auto; 
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        }
+        .log-header { padding: 15px; background: #252525; border-bottom: 1px solid #333; font-weight: 600; position: sticky; top: 0; }
+        #log-content { padding: 0; list-style: none; margin: 0; }
+        .log-item { padding: 12px 15px; border-bottom: 1px solid #333; display: flex; align-items: center; font-size: 0.95rem; animation: slideIn 0.3s ease-out; }
+        @keyframes slideIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+        .success { color: #66bb6a; font-weight: 600; margin-right: 8px; }
+        .error { color: #ef5350; font-weight: 600; margin-right: 8px; }
+        
+        /* Animación de parpadeo para error/duplicado */
+        .blink-alert { animation: blinkRed 0.5s ease-in-out; }
+        @keyframes blinkRed {
+            0%, 100% { background-color: #121212; }
+            50% { background-color: #4a1010; }
+        }
+
+        /* --- Estilos para los Ajustes --- */
+        .settings-icon { font-size: 24px; cursor: pointer; color: #aaa; transition: color 0.3s, transform 0.3s; }
+        .settings-icon:hover { color: #fff; transform: rotate(45deg); }
+        
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); display: none; justify-content: center; align-items: center; z-index: 1000; }
+        .modal-content { background: #2a2a2a; padding: 25px; border-radius: 16px; width: 90%; max-width: 350px; box-shadow: 0 5px 25px rgba(0,0,0,0.5); }
+        .modal-content h3 { margin-top: 0; border-bottom: 1px solid #444; padding-bottom: 10px; }
+        .setting-item { display: flex; justify-content: space-between; align-items: center; margin: 20px 0; }
+        
+        /* Toggle Switch */
+        .switch { position: relative; display: inline-block; width: 50px; height: 28px; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #444; transition: .4s; border-radius: 28px; }
+        .slider:before { position: absolute; content: ""; height: 20px; width: 20px; left: 4px; bottom: 4px; background-color: white; transition: .4s; border-radius: 50%; }
+        input:checked + .slider { background-color: #66bb6a; }
+        input:checked + .slider:before { transform: translateX(22px); }
+
+        .btn { padding: 10px 15px; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; transition: background-color 0.3s; width: 100%; margin-top: 10px; }
+        .btn-danger { background-color: #ef5350; color: white; }
+        .btn-danger:hover { background-color: #d32f2f; }
+        .btn-close { background-color: #555; color: white; }
+        .btn-close:hover { background-color: #666; }
+        .btn-success { background-color: #2e7d32; color: white; }
+        .btn-success:hover { background-color: #1b5e20; }
+
     </style>
 </head>
 <body>
 
-    <h2>🛡️ Registro de Activos Seguro</h2>
+    <div class="header-container">
+        <h2>🛡️ Registro de Activos</h2>
+        <span class="settings-icon" id="settings-btn">⚙️</span>
+    </div>
+
     <div id="reader"></div>
     
     <div class="log-container" id="history">
-        <strong>Historial de Sesión:</strong><br>
-        <div id="log-content"></div>
+        <div class="log-header">Historial: <span id="scan-count">0</span></div>
+        <ul id="log-content"></ul>
+    </div>
+
+    <!-- Modal de Ajustes -->
+    <div id="settings-modal" class="modal-overlay">
+        <div class="modal-content">
+            <h3>Ajustes</h3>
+            <div class="setting-item">
+                <span>Sonido de notificación</span>
+                <label class="switch">
+                    <input type="checkbox" id="sound-toggle">
+                    <span class="slider"></span>
+                </label>
+            </div>
+            <div class="setting-item">
+                <span>Vibración</span>
+                <label class="switch">
+                    <input type="checkbox" id="vibration-toggle">
+                    <span class="slider"></span>
+                </label>
+            </div>
+            <hr style="border-color: #444; margin: 25px 0;">
+            <button id="export-csv-btn" class="btn btn-success">Exportar CSV</button>
+            <button id="clear-history-btn" class="btn btn-danger">Borrar Historial</button>
+            <button id="close-modal-btn" class="btn btn-close">Cerrar</button>
+        </div>
     </div>
 
     <script>
         // 1. Sonido de éxito (Beep)
         const beep = new Audio("https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3");
+        // Sonido de error/duplicado
+        const errorBeep = new Audio("https://assets.mixkit.co/active_storage/sfx/2578/2578-preview.mp3");
         
         // 2. Base de datos temporal en el móvil
-        let scannedHistory = JSON.parse(localStorage.getItem('asset_history')) || [];
+        let scannedHistory = [];
+        let settings = {};
+
+        const log = document.getElementById('log-content');
+        const settingsModal = document.getElementById('settings-modal');
+        const soundToggle = document.getElementById('sound-toggle');
+        const vibrationToggle = document.getElementById('vibration-toggle');
+        const scanCountElement = document.getElementById('scan-count');
+
+        function addLogItem(message, type) {
+            const item = document.createElement('li');
+            item.className = 'log-item';
+            item.innerHTML = `<span class="${type}">[${type === 'success' ? '✔' : 'X'}] ${type.toUpperCase()}:</span> ${message}`;
+            log.prepend(item);
+        }
+
+        function updateCount() {
+            scanCountElement.textContent = scannedHistory.length;
+        }
 
         function onScanSuccess(decodedText) {
             const log = document.getElementById('log-content');
             
             // 3. Verificación de Duplicados
             if (scannedHistory.includes(decodedText)) {
-                log.innerHTML = `<span class="duplicate">[!] REPETIDO: ${decodedText}</span><br>` + log.innerHTML;
-                return; // Bloquea el proceso
+                // Feedback visual: Parpadeo de pantalla
+                document.body.classList.add('blink-alert');
+                setTimeout(() => document.body.classList.remove('blink-alert'), 500);
+
+                // Feedback auditivo: Sonido de error
+                if (settings.sound) { errorBeep.currentTime = 0; errorBeep.play(); }
+
+                // Feedback táctil
+                if (settings.vibration && navigator.vibrate) navigator.vibrate([50, 50, 50]);
+
+                // NO mostrar en la lista (return inmediato)
+                return; 
             }
 
             // 4. Validación de formato (Seguridad)
             // Filtramos para que solo acepte códigos con formato alfanumérico largo
             if(decodedText.length < 5) {
-                log.innerHTML = `<span class="error">[X] INVÁLIDO: Código muy corto</span><br>` + log.innerHTML;
+                addLogItem('Código muy corto', 'error');
                 return;
             }
 
             // 5. Acción de Éxito
-            beep.play();
+            if (settings.sound) beep.play();
             scannedHistory.push(decodedText);
             localStorage.setItem('asset_history', JSON.stringify(scannedHistory));
             
-            log.innerHTML = `<span class="success">[✔] REGISTRADO: ${decodedText}</span><br>` + log.innerHTML;
+            addLogItem(decodedText, 'success');
+            updateCount();
             
             // Vibración táctil (exclusivo para móviles como tu S24)
-            if (navigator.vibrate) navigator.vibrate(100);
+            if (settings.vibration && navigator.vibrate) navigator.vibrate(100);
         }
 
-        let html5QrcodeScanner = new Html5QrcodeScanner(
-            "reader", { fps: 20, qrbox: {width: 280, height: 180} }
-        );
-        html5QrcodeScanner.render(onScanSuccess);
+        function loadSettings() {
+            const savedSettings = JSON.parse(localStorage.getItem('scanner_settings'));
+            // Por defecto, todo activado
+            settings = {
+                sound: true,
+                vibration: true,
+                ...savedSettings
+            };
+            soundToggle.checked = settings.sound;
+            vibrationToggle.checked = settings.vibration;
+        }
+
+        function saveSettings() {
+            localStorage.setItem('scanner_settings', JSON.stringify(settings));
+        }
+
+        function loadHistory() {
+            scannedHistory = JSON.parse(localStorage.getItem('asset_history')) || [];
+            log.innerHTML = ''; // Limpiar vista
+            scannedHistory.forEach(code => addLogItem(code, 'success'));
+            updateCount();
+        }
+
+        function clearHistory() {
+            if (confirm('¿Estás seguro de que quieres borrar todo el historial? Esta acción no se puede deshacer.')) {
+                scannedHistory = [];
+                localStorage.removeItem('asset_history');
+                log.innerHTML = '';
+                updateCount();
+                settingsModal.style.display = 'none';
+            }
+        }
+
+        function exportToCSV() {
+            if (scannedHistory.length === 0) {
+                alert("No hay datos para exportar.");
+                return;
+            }
+            const csvContent = "Codigo\n" + scannedHistory.join("\n");
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            link.setAttribute("href", url);
+            link.setAttribute("download", `activos_scan_${new Date().toISOString().slice(0,10)}.csv`);
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        // --- Event Listeners ---
+        document.addEventListener('DOMContentLoaded', () => {
+            loadSettings();
+            loadHistory();
+
+            const html5QrcodeScanner = new Html5QrcodeScanner(
+                "reader", { 
+                fps: 30, // Más rápido
+                qrbox: {width: 300, height: 200}, // Caja de escaneo más grande
+                videoConstraints: { facingMode: "environment" } // Prioriza cámara trasera
+                }, 
+                false // verbose
+            );
+            html5QrcodeScanner.render(onScanSuccess);
+
+            // Listeners para el modal de ajustes
+            document.getElementById('settings-btn').addEventListener('click', () => {
+                settingsModal.style.display = 'flex';
+            });
+            document.getElementById('close-modal-btn').addEventListener('click', () => {
+                settingsModal.style.display = 'none';
+            });
+            document.getElementById('clear-history-btn').addEventListener('click', clearHistory);
+            document.getElementById('export-csv-btn').addEventListener('click', exportToCSV);
+
+            soundToggle.addEventListener('change', (e) => {
+                settings.sound = e.target.checked;
+                saveSettings();
+            });
+            vibrationToggle.addEventListener('change', (e) => {
+                settings.vibration = e.target.checked;
+                saveSettings();
+            });
+        });
     </script>
 </body>
 </html>
