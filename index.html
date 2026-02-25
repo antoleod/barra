@@ -1,589 +1,674 @@
 ﻿<!DOCTYPE html>
-<html lang="es">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>S24 Asset Security Scan</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Barra Scanner Pro</title>
+    <meta name="theme-color" content="#000000">
     <script src="https://unpkg.com/html5-qrcode"></script>
     <style>
+        /* --- CORE STYLES --- */
+        :root {
+            --bg-color: #000000;
+            --card-bg: #1c1c1e;
+            --text-primary: #ffffff;
+            --text-secondary: #8e8e93;
+            --accent-color: #0A84FF;
+            --success-color: #30d158;
+            --warning-color: #ff9f0a;
+            --danger-color: #ff453a;
+            --border-color: #38383a;
+            --font-stack: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        }
+
         body { 
-            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; 
-            background: #121212; 
-            color: #e0e0e0; 
+            font-family: var(--font-stack);
+            background: var(--bg-color); 
+            color: var(--text-primary); 
             display: flex; 
             flex-direction: column; 
             align-items: center; 
             min-height: 100vh;
             margin: 0;
-            padding: 20px;
+            padding: 16px;
             box-sizing: border-box;
+            -webkit-font-smoothing: antialiased;
         }
+
+        /* --- HEADER & CONTROLS --- */
         .header-container {
             width: 100%;
-            max-width: 400px;
+            max-width: 600px;
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 20px;
+            margin-bottom: 16px;
         }
-        h2 { margin: 0; font-weight: 600; letter-spacing: 0.5px; color: #fff; }
+        h1 { margin: 0; font-size: 1.5rem; font-weight: 700; letter-spacing: -0.5px; }
+        
+        .mode-selector {
+            display: flex;
+            background: var(--card-bg);
+            border-radius: 9px;
+            padding: 2px;
+            margin-bottom: 16px;
+            width: 100%;
+            max-width: 600px;
+        }
+        .mode-btn {
+            flex: 1;
+            border: none;
+            background: transparent;
+            color: var(--text-secondary);
+            padding: 8px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            border-radius: 7px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .mode-btn.active {
+            background: var(--accent-color);
+            color: white;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        }
 
+        /* --- SCANNER AREA --- */
         #reader { 
             width: 100%; 
-            max-width: 400px; 
-            border-radius: 16px; 
-            box-shadow: 0 4px 20px rgba(0,0,0,0.5); 
+            max-width: 600px; 
+            border-radius: 18px; 
             overflow: hidden; 
             background: #000; 
-            border: none;
+            position: relative;
+            min-height: 250px;
         }
+        
+        /* --- LIST & LOGS --- */
         .log-container { 
             width: 100%; 
-            max-width: 400px; 
-            margin-top: 24px; 
-            background: #1e1e1e; 
-            border-radius: 12px; 
-            text-align: left; 
-            max-height: 300px; 
-            overflow-y: auto; 
-            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            max-width: 600px; 
+            margin-top: 20px; 
+            background: var(--card-bg); 
+            border-radius: 18px; 
+            display: flex;
+            flex-direction: column;
+            flex: 1;
+            overflow: hidden;
         }
-        .log-header { padding: 15px; background: #252525; border-bottom: 1px solid #333; font-weight: 600; position: sticky; top: 0; }
-        #log-content { padding: 0; list-style: none; margin: 0; }
-        .log-item { padding: 12px 15px; border-bottom: 1px solid #333; display: flex; align-items: center; font-size: 0.95rem; animation: slideIn 0.3s ease-out; cursor: pointer; transition: background 0.2s; }
-        .log-item:hover { background: #2a2a2a; }
-        @keyframes slideIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
-        .success { color: #66bb6a; font-weight: 600; margin-right: 8px; }
-        .error { color: #ef5350; font-weight: 600; margin-right: 8px; }
-        
-        /* Animación de parpadeo para error/duplicado */
-        .blink-alert { animation: blinkRed 0.5s ease-in-out; }
-        @keyframes blinkRed {
-            0%, 100% { background-color: #121212; }
-            50% { background-color: #4a1010; }
+        .log-header { 
+            padding: 12px 16px; 
+            background: rgba(28, 28, 30, 0.95); 
+            border-bottom: 1px solid var(--border-color); 
+            backdrop-filter: blur(10px);
+            z-index: 10;
         }
+        .tabs { display: flex; gap: 10px; margin-bottom: 10px; }
+        .tab { 
+            font-size: 0.85rem; color: var(--text-secondary); cursor: pointer; padding-bottom: 4px; border-bottom: 2px solid transparent; 
+        }
+        .tab.active { color: var(--text-primary); border-color: var(--accent-color); font-weight: 600; }
 
-        /* --- Estilos para los Ajustes --- */
-        .settings-icon { font-size: 24px; cursor: pointer; color: #aaa; transition: color 0.3s, transform 0.3s; }
-        .settings-icon:hover { color: #fff; transform: rotate(45deg); }
+        #log-content { 
+            padding: 0; list-style: none; margin: 0; 
+            overflow-y: auto; max-height: 40vh;
+        }
+        .log-item { 
+            padding: 16px; 
+            border-bottom: 1px solid var(--border-color); 
+            display: flex; 
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.95rem; 
+        }
+        .log-item:last-child { border-bottom: none; }
         
-        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); display: none; justify-content: center; align-items: center; z-index: 1000; }
-        .modal-content { background: #2a2a2a; padding: 25px; border-radius: 16px; width: 90%; max-width: 350px; box-shadow: 0 5px 25px rgba(0,0,0,0.5); max-height: 85vh; overflow-y: auto; }
+        .item-info { display: flex; flex-direction: column; gap: 4px; }
+        .item-code { font-family: monospace; font-size: 1.1em; font-weight: 600; }
+        .item-meta { font-size: 0.75rem; color: var(--text-secondary); display: flex; gap: 8px; align-items: center; }
+        
+        .badge { padding: 2px 6px; border-radius: 4px; font-size: 0.7rem; font-weight: 700; text-transform: uppercase; }
+        .badge-full { background: rgba(10, 132, 255, 0.2); color: #64d2ff; }
+        .badge-short { background: rgba(255, 159, 10, 0.2); color: #ffd60a; }
+        .badge-pending { background: #3a3a3c; color: #aaa; }
+        .badge-sent { background: rgba(48, 209, 88, 0.2); color: #30d158; }
+        .badge-used { background: rgba(255, 69, 58, 0.2); color: #ff453a; }
+
+        /* --- UTILS --- */
+        #search-input { 
+            width:100%; padding:10px 12px; border-radius:10px; border:none; 
+            background:#2c2c2e; color:white; box-sizing:border-box; font-size: 1rem; 
+        }
+        
+        .blink-error { animation: blinkRed 0.4s ease-in-out; }
+        @keyframes blinkRed { 0%, 100% { background: #000; } 50% { background: #4a1010; } }
+
+        .icon-btn { font-size: 1.2rem; cursor: pointer; padding: 8px; border-radius: 50%; background: #2c2c2e; border: none; color: white; }
+        .icon-btn:active { transform: scale(0.95); }
+
+        /* --- MODALS --- */
+        .modal-overlay { 
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
+            background: rgba(0,0,0,0.6); backdrop-filter: blur(5px); 
+            display: none; justify-content: center; align-items: center; z-index: 1000; 
+        }
+        .modal-content { 
+            background: #1c1c1e; padding: 24px; border-radius: 20px; 
+            width: 90%; max-width: 400px; max-height: 85vh; overflow-y: auto; 
+            box-shadow: 0 20px 40px rgba(0,0,0,0.6); border: 1px solid var(--border-color);
+        }
         .modal-content h3 { margin-top: 0; border-bottom: 1px solid #444; padding-bottom: 10px; }
-        .setting-item { display: flex; justify-content: space-between; align-items: center; margin: 20px 0; }
         
-        /* Toggle Switch */
+        .setting-group { margin-bottom: 20px; }
+        .setting-label { display: block; font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px; }
+        .setting-input { width: 100%; background: #2c2c2e; border: 1px solid #444; color: white; padding: 10px; border-radius: 8px; box-sizing: border-box; }
+        
         .switch { position: relative; display: inline-block; width: 50px; height: 28px; }
         .switch input { opacity: 0; width: 0; height: 0; }
-        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #444; transition: .4s; border-radius: 28px; }
+        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #3a3a3c; transition: .4s; border-radius: 28px; }
         .slider:before { position: absolute; content: ""; height: 20px; width: 20px; left: 4px; bottom: 4px; background-color: white; transition: .4s; border-radius: 50%; }
-        input:checked + .slider { background-color: #66bb6a; }
-        input:checked + .slider:before { transform: translateX(22px); }
+        input:checked + .slider { background-color: var(--success-color); }
+        input:checked + .slider:before { transform: translateX(22px); } 
 
-        .btn { padding: 10px 15px; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; transition: background-color 0.3s; width: 100%; margin-top: 10px; }
-        .btn-danger { background-color: #ef5350; color: white; }
-        .btn-danger:hover { background-color: #d32f2f; }
-        .btn-close { background-color: #555; color: white; }
-        .btn-close:hover { background-color: #666; }
-        .btn-success { background-color: #2e7d32; color: white; }
-        .btn-success:hover { background-color: #1b5e20; }
-        .btn-layout { background-color: #1976d2; color: white; margin-bottom: 10px; padding: 15px; font-size: 1.1rem; }
-        .btn-layout:hover { background-color: #1565c0; }
+        .btn { width: 100%; padding: 14px; border-radius: 12px; border: none; font-weight: 600; font-size: 1rem; margin-top: 10px; cursor: pointer; }
+        .btn-primary { background: var(--accent-color); color: white; }
+        .btn-secondary { background: #3a3a3c; color: white; }
+        .btn-danger { background: rgba(255, 69, 58, 0.15); color: var(--danger-color); }
         
-        /* Scanner Laser Theme */
-        #reader__scan_region { position: relative; overflow: hidden; }
-        #reader__scan_region::after {
-            content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; background: #66bb6a; box-shadow: 0 0 4px #66bb6a;
-            animation: scanLaser 2s infinite linear; opacity: 0.6;
-        }
-        @keyframes scanLaser {
-            0% { top: 0; } 50% { top: 100%; } 100% { top: 0; }
-        }
-
-        /* Status Indicator */
-        .status-indicator {
-            width: 10px;
-            height: 10px;
-            border-radius: 50%;
-            background-color: #ef5350; /* Red */
-            transition: background-color 0.3s, box-shadow 0.3s;
-        }
-        .status-connected {
-            background-color: #66bb6a; /* Green */
-            box-shadow: 0 0 8px #66bb6a;
-        }
-
+        .help-text { font-size: 0.8rem; color: var(--text-secondary); margin-top: 4px; line-height: 1.4; }
     </style>
 </head>
 <body>
 
+    <!-- HEADER -->
     <div class="header-container">
         <div style="display:flex; align-items:center; gap:10px;">
-            <div id="connection-status" class="status-indicator" title="Sin conexión a Google Sheets"></div>
-            <h2>🛡️ Registro</h2>
+            <h1>Barra Scanner</h1>
+            <span id="offline-badge" class="badge badge-used" style="display:none;">OFFLINE</span>
         </div>
         <div style="display:flex; gap: 15px;">
-            <span class="settings-icon" id="pause-btn" title="Pausar Escáner">⏸️</span>
-            <span class="settings-icon" id="trash-btn" title="Borrar Historial">🗑️</span>
-            <span class="settings-icon" id="settings-btn">⚙️</span>
+            <button class="icon-btn" id="sync-btn" title="Sync">☁️</button>
+            <button class="icon-btn" id="settings-btn" title="Settings">⚙️</button>
         </div>
     </div>
 
+    <!-- MODE SELECTOR -->
+    <div class="mode-selector">
+        <button class="mode-btn active" id="mode-full" onclick="app.setMode('FULL')">FULL PI</button>
+        <button class="mode-btn" id="mode-short" onclick="app.setMode('SHORT')">SHORT</button>
+    </div>
+
+    <!-- SCANNER -->
     <div id="reader"></div>
-    <div id="reader-error" style="color: #ef5350; margin-top: 15px; font-weight: 600; display: none; max-width: 400px; text-align: center;"></div>
+    <div id="scan-feedback" style="margin-top:10px; min-height:20px; text-align:center; font-weight:600;"></div>
     
+    <!-- LIST -->
     <div class="log-container" id="history">
         <div class="log-header">
-            <div style="margin-bottom: 8px;">Historial: <span id="scan-count">0</span></div>
-            <input type="text" id="search-input" placeholder="🔍 Buscar activo..." style="width:100%; padding:8px; border-radius:6px; border:1px solid #444; background:#333; color:white; box-sizing:border-box;">
+            <div class="tabs">
+                <div class="tab active" onclick="app.filterList('all')">All</div>
+                <div class="tab" onclick="app.filterList('pending')">Pending</div>
+                <div class="tab" onclick="app.filterList('sent')">Sent</div>
+            </div>
+            <input type="text" id="search-input" placeholder="🔍 Search code...">
         </div>
         <ul id="log-content"></ul>
     </div>
 
-    <!-- Modal de Ajustes -->
+    <!-- SETTINGS MODAL -->
     <div id="settings-modal" class="modal-overlay">
         <div class="modal-content">
-            <h3>Ajustes</h3>
-            <div class="setting-item">
-                <span>Sonido de notificación</span>
-                <label class="switch">
-                    <input type="checkbox" id="sound-toggle">
-                    <span class="slider"></span>
-                </label>
+            <h3>Settings</h3>
+            
+            <div class="setting-group">
+                <label class="setting-label">Google Form Prefill Link</label>
+                <input type="text" id="form-url-input" class="setting-input" placeholder="https://docs.google.com/forms/d/e/.../viewform?entry.123={{CODE}}">
+                <p class="help-text">Use placeholders: <code>{{CODE}}</code>, <code>{{MODE}}</code>, <code>{{LAYOUT}}</code></p>
             </div>
-            <div class="setting-item">
-                <span>Vibración</span>
-                <label class="switch">
-                    <input type="checkbox" id="vibration-toggle">
-                    <span class="slider"></span>
-                </label>
+
+            <div class="setting-group">
+                <label class="setting-label">Validation Rules</label>
+                <div style="display:flex; justify-content:space-between; margin-bottom:10px;">
+                    <span>OCR Correction (0/O, 1/I)</span>
+                    <label class="switch"><input type="checkbox" id="ocr-toggle"><span class="slider"></span></label>
+                </div>
+                <input type="text" id="full-prefix" class="setting-input" value="02PI20" placeholder="Full Prefix (e.g. 02PI20)">
+                <input type="text" id="short-prefix" class="setting-input" value="MUSTBRUN" placeholder="Short Prefix (e.g. MUSTBRUN)" style="margin-top:8px;">
             </div>
-            <div class="setting-item">
-                <span>Detener tras escanear</span>
-                <label class="switch">
-                    <input type="checkbox" id="stop-scan-toggle">
-                    <span class="slider"></span>
-                </label>
-            </div>
-            <div class="setting-item" style="display:block; margin-top:10px;">
-                <span style="display:block; margin-bottom:8px; font-size:0.9rem; color:#ccc;">URL del Script de Google (Web App)</span>
-                <input type="text" id="sheet-url-input" placeholder="Pega aquí la URL de tu Web App..." style="width:100%; padding:10px; background:#333; border:1px solid #555; color:white; border-radius:8px; box-sizing:border-box; font-size:0.85rem;">
-                <small style="display:block; margin-top:5px; color:#aaa; font-size:0.75rem; line-height: 1.4;">
-                    Nota: No es la URL de la hoja. En tu Google Sheet ve a <b>Extensiones > Apps Script > Implementar > Aplicación Web</b> y copia la URL que termina en <code>/exec</code>.
-                </small>
-            </div>
-            <hr style="border-color: #444; margin: 25px 0;">
-            <button id="open-sheet-btn" class="btn btn-layout" style="margin-bottom: 0; padding: 10px 15px; font-size: 1rem;">Abrir Hoja de Google</button>
-            <button id="test-connection-btn" class="btn btn-layout" style="background-color: #0097a7; color: white;">Probar Conexión</button>
-            <button id="export-csv-btn" class="btn btn-success">Exportar CSV</button>
-            <button id="export-json-btn" class="btn btn-layout" style="background-color: #f57c00; color: white;">Exportar JSON</button>
-            <button id="clear-history-btn" class="btn btn-danger">Borrar Historial</button>
-            <button id="close-modal-btn" class="btn btn-close">Cerrar</button>
+
+            <button class="btn btn-secondary" onclick="app.exportCSV()">Export CSV</button>
+            <button class="btn btn-danger" onclick="app.clearDatabase()">Clear Database</button>
+            <button class="btn btn-primary" onclick="document.getElementById('settings-modal').style.display='none'">Close</button>
         </div>
     </div>
 
-    <!-- Modal de Selección de Teclado -->
+    <!-- LAYOUT MODAL -->
     <div id="layout-modal" class="modal-overlay">
         <div class="modal-content">
-            <h3>Seleccione Distribución</h3>
-            <p id="layout-prompt-code" style="color: #aaa; margin-bottom: 15px; word-break: break-all;"></p>
-            <button class="btn btn-layout" onclick="confirmLayout('QWERTY')">QWERTY</button>
-            <button class="btn btn-layout" onclick="confirmLayout('AZERTY')">AZERTY</button>
-            <button class="btn btn-layout" onclick="confirmLayout('QWERTZU')">QWERTZU</button>
-            <button class="btn btn-close" onclick="cancelLayout()">Cancelar</button>
+            <h3>Select Layout</h3>
+            <p id="layout-prompt-code" class="item-code" style="margin-bottom: 20px;"></p>
+            <button class="btn btn-primary" onclick="app.confirmScan('QWERTY')">QWERTY</button>
+            <button class="btn btn-primary" onclick="app.confirmScan('AZERTY')">AZERTY</button>
+            <button class="btn btn-primary" onclick="app.confirmScan('QWERTZU')">QWERTZU</button>
+            <button class="btn btn-secondary" onclick="app.cancelScan()">Cancel</button>
         </div>
     </div>
 
-    <!-- Modal de Edición -->
-    <div id="edit-modal" class="modal-overlay">
+    <!-- SYNC MODAL -->
+    <div id="sync-modal" class="modal-overlay">
         <div class="modal-content">
-            <h3>Editar Registro</h3>
-            <input type="text" id="edit-input" style="width: 100%; padding: 12px; margin: 15px 0; background: #333; border: 1px solid #555; color: white; border-radius: 8px; box-sizing: border-box; font-size: 1rem;">
-            <div style="display: flex; gap: 10px; margin-top: 5px;">
-                <button id="save-edit-btn" class="btn btn-success" style="margin-top:0;">Guardar</button>
-                <button id="delete-item-btn" class="btn btn-danger" style="margin-top:0;">Eliminar</button>
-            </div>
-            <button id="close-edit-btn" class="btn btn-close">Cancelar</button>
+            <h3>Sync Pending</h3>
+            <p class="help-text">Click "Open Form" to submit data. Then click "Mark Sent".</p>
+            <div id="sync-list" style="max-height: 300px; overflow-y: auto; margin: 10px 0;"></div>
+            <button class="btn btn-secondary" onclick="document.getElementById('sync-modal').style.display='none'">Close</button>
         </div>
     </div>
 
     <script>
-        // 1. Sonido de éxito (Beep)
-        const beep = new Audio("https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3");
-        // Sonido de error/duplicado
-        const errorBeep = new Audio("https://assets.mixkit.co/active_storage/sfx/2578/2578-preview.mp3");
-        
-        // 2. Base de datos temporal en el móvil
-        let scannedHistory = [];
-        let settings = {};
-        let currentEditIndex = -1;
-        let tempScannedCode = "";
-        let isProcessing = false;
-        let isPaused = false;
-        let html5QrcodeScanner = null;
-        // URL de la hoja para el botón "Abrir"
-        const GOOGLE_SHEET_VIEW_URL = "https://docs.google.com/spreadsheets/d/1_VT_QFvuObqWvA-4vngm7u_KBhfIA1AmP-BOjzncJwY/edit?usp=sharing";
+        /**
+         * BARRA SCANNER PRO - Single File Architecture
+         * Modules: Storage (IndexedDB), Logic (Validation/Conversion), UI, App (Controller)
+         */
 
-        const log = document.getElementById('log-content');
-        const settingsModal = document.getElementById('settings-modal');
-        const editModal = document.getElementById('edit-modal');
-        const layoutModal = document.getElementById('layout-modal');
-        const editInput = document.getElementById('edit-input');
-        const sheetUrlInput = document.getElementById('sheet-url-input');
-        const soundToggle = document.getElementById('sound-toggle');
-        const stopScanToggle = document.getElementById('stop-scan-toggle');
-        const vibrationToggle = document.getElementById('vibration-toggle');
-        const scanCountElement = document.getElementById('scan-count');
-        const connectionStatusElement = document.getElementById('connection-status');
-        const pauseBtn = document.getElementById('pause-btn');
-        const searchInput = document.getElementById('search-input');
+        // --- 1. STORAGE MODULE (IndexedDB) ---
+        const db = {
+            dbName: 'BarraScannerDB',
+            version: 1,
+            instance: null,
 
-        // Renderizado completo del historial
-        function renderHistory() {
-            log.innerHTML = '';
-            // Iteramos en reverso para mostrar el más reciente arriba
-            scannedHistory.slice().reverse().forEach((item, reversedIndex) => {
-                // Calculamos el índice real en el array original
-                const realIndex = scannedHistory.length - 1 - reversedIndex;
-                
-                const li = document.createElement('li');
-                li.className = 'log-item';
-                // Manejo de compatibilidad para items antiguos (strings) vs nuevos (objetos)
-                const displayCode = typeof item === 'string' ? item : item.code;
-                const displayLayout = (typeof item === 'object' && item.layout) ? `<small style="color:#aaa; margin-left:5px;">(${item.layout})</small>` : '';
-                
-                li.innerHTML = `<span class="success">[✔] REGISTRADO:</span> ${displayCode} ${displayLayout}`;
-                
-                // Evento Click para editar
-                li.onclick = () => openEditModal(realIndex);
-
-                // Evento Swipe (Deslizar) para archivar
-                let touchStartX = 0;
-                li.addEventListener('touchstart', e => {
-                    touchStartX = e.changedTouches[0].screenX;
-                }, {passive: true});
-                
-                li.addEventListener('touchend', e => {
-                    const touchEndX = e.changedTouches[0].screenX;
-                    // Si desliza más de 100px a la izquierda
-                    if (touchStartX - touchEndX > 100) { 
-                        if(confirm("¿Archivar este registro?")) {
-                            scannedHistory.splice(realIndex, 1);
-                            persistHistory();
-                            renderHistory();
+            init() {
+                return new Promise((resolve, reject) => {
+                    const request = indexedDB.open(this.dbName, this.version);
+                    request.onupgradeneeded = (e) => {
+                        const db = e.target.result;
+                        if (!db.objectStoreNames.contains('scans')) {
+                            const store = db.createObjectStore('scans', { keyPath: 'id', autoIncrement: true });
+                            store.createIndex('code_normalized', 'code_normalized', { unique: false });
+                            store.createIndex('status', 'status', { unique: false });
                         }
-                    }
-                }, {passive: true});
+                    };
+                    request.onsuccess = (e) => {
+                        this.instance = e.target.result;
+                        resolve(this.instance);
+                    };
+                    request.onerror = (e) => reject(e);
+                });
+            },
 
-                log.appendChild(li);
-            });
-            filterList(); // Aplicar filtro si hay texto en el buscador
-            updateCount();
-        }
+            async addScan(scanData) {
+                return new Promise((resolve, reject) => {
+                    const tx = this.instance.transaction(['scans'], 'readwrite');
+                    const store = tx.objectStore('scans');
+                    const request = store.add(scanData);
+                    request.onsuccess = () => resolve(request.result);
+                    request.onerror = () => reject(request.error);
+                });
+            },
 
-        function updateCount() {
-            scanCountElement.textContent = scannedHistory.length;
-        }
+            async getAll() {
+                return new Promise((resolve) => {
+                    const tx = this.instance.transaction(['scans'], 'readonly');
+                    const request = tx.objectStore('scans').getAll();
+                    request.onsuccess = () => resolve(request.result);
+                });
+            },
 
-        function normalizeRecord(item) {
-            if (typeof item === 'string') {
-                return { code: item, layout: 'N/A', date: '' };
-            }
-
-            return {
-                code: item.code || '',
-                layout: item.layout || 'N/A',
-                date: item.date || ''
-            };
-        }
-
-        function hasValidWebAppUrl() {
-            return Boolean(
-                settings.sheetWebAppUrl &&
-                /script\.google\.com\/macros\/s\/.+\/exec/.test(settings.sheetWebAppUrl)
-            );
-        }
-
-        function showSyncMessage(message, isError = false) {
-            const el = document.getElementById('reader-error');
-            el.innerHTML = message;
-            el.style.color = isError ? '#ef5350' : '#66bb6a';
-            el.style.display = 'block';
-            setTimeout(() => {
-                el.style.display = 'none';
-            }, 2600);
-        }
-
-        async function postToGoogleSheet(payload) {
-            if (!hasValidWebAppUrl()) return;
-            await fetch(settings.sheetWebAppUrl, {
-                method: 'POST',
-                mode: 'no-cors',
-                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-                body: JSON.stringify(payload)
-            });
-        }
-
-        async function syncHistoryToGoogleSheet() {
-            await postToGoogleSheet({
-                action: 'replaceAll',
-                updatedAt: new Date().toISOString(),
-                records: scannedHistory.map(normalizeRecord)
-            });
-        }
-
-        async function appendRecordToGoogleSheet(record) {
-            await postToGoogleSheet({
-                action: 'append',
-                updatedAt: new Date().toISOString(),
-                record: normalizeRecord(record)
-            });
-        }
-
-        function persistHistory(syncRemote = true) {
-            localStorage.setItem('asset_history', JSON.stringify(scannedHistory));
-            if (!syncRemote) return;
-            syncHistoryToGoogleSheet().catch((error) => console.error('Error sincronizando Google Sheets:', error));
-        }
-
-        function transformCode(code) {
-            // Regla: 02PI + 20xx + resto + 2digitos -> MUSTBRUN + xx + resto
-            // Ejemplo: 02PI20230850811 -> MUSTBRUN2308508
-            // Explicación: Reemplaza '02PI' con 'MUSTBRUN', '2023' con '23', y elimina los últimos 2 dígitos '11'.
-            const regex = /^02PI20(\d{2})(.+)\d{2}$/;
-            if (regex.test(code)) {
-                return code.replace(regex, "MUSTBRUN$1$2");
-            }
-            return code;
-        }
-
-        function onScanSuccess(decodedText) {
-            if (isProcessing) return;
-
-            // Aplicar transformación de código (Regla de negocio)
-            decodedText = transformCode(decodedText);
-
-            const log = document.getElementById('log-content');
-            
-            // 3. Verificación de Duplicados
-            // Comprobamos si existe el código en el historial (soportando objetos y strings antiguos)
-            const isDuplicate = scannedHistory.some(item => (typeof item === 'string' ? item : item.code) === decodedText);
-            
-            if (isDuplicate) {
-                // Feedback visual: Parpadeo de pantalla
-                document.body.classList.add('blink-alert');
-                setTimeout(() => document.body.classList.remove('blink-alert'), 500);
-
-                // Feedback auditivo: Sonido de error
-                if (settings.sound) { errorBeep.currentTime = 0; errorBeep.play(); }
-
-                // Feedback táctil
-                if (settings.vibration && navigator.vibrate) navigator.vibrate([50, 50, 50]);
-
-                // NO mostrar en la lista (return inmediato)
-                return; 
-            }
-
-            // 4. Validación de formato (Seguridad)
-            // Filtramos para que solo acepte códigos con formato alfanumérico largo
-            if(decodedText.length < 5) {
-                // Mostramos error temporalmente en la lista (sin guardar en historial)
-                const item = document.createElement('li');
-                item.className = 'log-item';
-                item.innerHTML = `<span class="error">[X] ERROR:</span> Código muy corto`;
-                log.prepend(item);
-                return;
-            }
-
-            // 5. Pausar y preguntar por el teclado
-            if (settings.sound) beep.play();
-            
-            // Vibración inicial
-            if (settings.vibration && navigator.vibrate) navigator.vibrate(100);
-
-            // Abrir modal de selección
-            isProcessing = true;
-            tempScannedCode = decodedText;
-            document.getElementById('layout-prompt-code').textContent = `Código: ${decodedText}`;
-            layoutModal.style.display = 'flex';
-        }
-
-        function confirmLayout(layout) {
-            const newRecord = {
-                code: tempScannedCode,
-                layout: layout,
-                date: new Date().toLocaleString()
-            };
-            
-            scannedHistory.push(newRecord);
-            // Sincronizar todo el historial para asegurar compatibilidad con el script
-            persistHistory(true);
-
-            if (!hasValidWebAppUrl()) {
-                showSyncMessage('Configura la URL /exec del Apps Script para guardar en Google Sheets.', true);
-            }
-            renderHistory();
-
-            // Lógica para detener el escáner si la opción está activa
-            if (settings.stopOnScan && html5QrcodeScanner) {
-                html5QrcodeScanner.clear().then(() => {
-                    const readerDiv = document.getElementById('reader');
-                    readerDiv.innerHTML = '<div style="display:flex; justify-content:center; align-items:center; height:200px; background:#111;"><button id="resume-scan-btn" class="btn btn-success" style="width:auto; padding:15px 30px; font-size:1.1rem;">📷 Escanear Nuevo</button></div>';
-                    document.getElementById('resume-scan-btn').addEventListener('click', startScanner);
-                    if(pauseBtn) {
-                        pauseBtn.textContent = "▶️";
-                        pauseBtn.title = "Reanudar Escáner";
-                    }
-                    isPaused = true;
-                }).catch(err => console.error("Error al detener escáner", err));
-            }
-
-            closeLayoutModal();
-        }
-
-        function cancelLayout() {
-            closeLayoutModal();
-        }
-
-        function closeLayoutModal() {
-            layoutModal.style.display = 'none';
-            tempScannedCode = "";
-            // Pequeño delay para evitar re-escaneo inmediato de lo mismo si la cámara sigue apuntando
-            setTimeout(() => { isProcessing = false; }, 1000);
-        }
-
-        function updateConnectionStatus() {
-            if (hasValidWebAppUrl()) {
-                connectionStatusElement.classList.add('status-connected');
-                connectionStatusElement.title = "Conectado a Google Sheets";
-            } else {
-                connectionStatusElement.classList.remove('status-connected');
-                connectionStatusElement.title = "Sin conexión: falta URL /exec de Apps Script";
-            }
-        }
-
-        function loadSettings() {
-            const savedSettings = JSON.parse(localStorage.getItem('scanner_settings'));
-            // Por defecto, todo activado
-            settings = {
-                sound: true,
-                vibration: true,
-                stopOnScan: false,
-                sheetWebAppUrl: "https://script.google.com/macros/s/AKfycbzAGUpxnCXDsr7llJlh_75rKdnwd5xJJIxWJVXy9ekUzqII6lTCpAiKVuYVfGQ_V8dWwA/exec",
-                ...savedSettings
-            };
-            soundToggle.checked = settings.sound;
-            stopScanToggle.checked = settings.stopOnScan;
-            vibrationToggle.checked = settings.vibration;
-            sheetUrlInput.value = settings.sheetWebAppUrl || "";
-            updateConnectionStatus();
-        }
-
-        function saveSettings() {
-            localStorage.setItem('scanner_settings', JSON.stringify(settings));
-        }
-
-        function loadHistory() {
-            scannedHistory = JSON.parse(localStorage.getItem('asset_history')) || [];
-            renderHistory();
-        }
-
-        function clearHistory() {
-            if (confirm('¿Estás seguro de que quieres borrar todo el historial? Esta acción no se puede deshacer.')) {
-                scannedHistory = [];
-                persistHistory();
-                renderHistory();
-                settingsModal.style.display = 'none';
-            }
-        }
-
-        // --- Funciones de Edición ---
-        function openEditModal(index) {
-            currentEditIndex = index;
-            const item = scannedHistory[index];
-            editInput.value = typeof item === 'string' ? item : item.code;
-            editModal.style.display = 'flex';
-        }
-
-        function saveEdit() {
-            if (currentEditIndex > -1) {
-                const newValue = editInput.value.trim();
-                if (newValue) {
-                    // Mantener el layout y fecha si es un objeto, o convertir a objeto si era string
-                    const oldItem = scannedHistory[currentEditIndex];
-                    if (typeof oldItem === 'object') {
-                        scannedHistory[currentEditIndex].code = newValue;
-                    } else {
-                        scannedHistory[currentEditIndex] = newValue; // Mantener compatibilidad simple o actualizar a objeto
-                    }
-                    persistHistory();
-                    renderHistory();
-                    editModal.style.display = 'none';
+            async updateStatus(id, status) {
+                const tx = this.instance.transaction(['scans'], 'readwrite');
+                const store = tx.objectStore('scans');
+                const item = await new Promise(r => store.get(id).onsuccess = e => r(e.target.result));
+                if(item) {
+                    item.status = status;
+                    store.put(item);
                 }
-            }
-        }
+            },
 
-        function deleteItem() {
-            if (currentEditIndex > -1 && confirm('¿Eliminar este registro?')) {
-                scannedHistory.splice(currentEditIndex, 1);
-                persistHistory();
-                renderHistory();
-                editModal.style.display = 'none';
-            }
-        }
+            async markUsed(id) {
+                const tx = this.instance.transaction(['scans'], 'readwrite');
+                const store = tx.objectStore('scans');
+                const item = await new Promise(r => store.get(id).onsuccess = e => r(e.target.result));
+                if(item) {
+                    item.used = true;
+                    item.dateUsed = new Date().toISOString();
+                    store.put(item);
+                }
+            },
 
-        function exportToCSV() {
-            if (scannedHistory.length === 0) {
-                alert("No hay datos para exportar.");
-                return;
+            async clear() {
+                const tx = this.instance.transaction(['scans'], 'readwrite');
+                tx.objectStore('scans').clear();
+                return new Promise(r => tx.oncomplete = r);
             }
-            
-            let csvContent = "Codigo,Layout,Fecha\n";
-            scannedHistory.forEach(item => {
-                const code = typeof item === 'string' ? item : item.code;
-                const layout = (typeof item === 'object' && item.layout) ? item.layout : 'N/A';
-                const date = (typeof item === 'object' && item.date) ? item.date : '';
-                csvContent += `${code},${layout},${date}\n`;
-            });
-            
-            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-            const url = URL.createObjectURL(blob);
-            const link = document.createElement("a");
-            link.setAttribute("href", url);
-            link.setAttribute("download", `activos_scan_${new Date().toISOString().slice(0,10)}.csv`);
-            link.style.visibility = 'hidden';
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-        }
+        };
 
-        function exportToJSON() {
-            if (scannedHistory.length === 0) {
-                alert("No hay datos para exportar.");
-                return;
+        // --- 2. LOGIC MODULE (Validation & Conversion) ---
+        const logic = {
+            settings: {
+                fullPrefix: '02PI20',
+                shortPrefix: 'MUSTBRUN',
+                ocrCorrection: true,
+                formUrl: ''
+            },
+
+            loadSettings() {
+                const saved = localStorage.getItem('barra_settings');
+                if (saved) this.settings = { ...this.settings, ...JSON.parse(saved) };
+                
+                // UI Sync
+                document.getElementById('full-prefix').value = this.settings.fullPrefix;
+                document.getElementById('short-prefix').value = this.settings.shortPrefix;
+                document.getElementById('ocr-toggle').checked = this.settings.ocrCorrection;
+                document.getElementById('form-url-input').value = this.settings.formUrl;
+            },
+
+            saveSettings() {
+                this.settings.fullPrefix = document.getElementById('full-prefix').value.trim();
+                this.settings.shortPrefix = document.getElementById('short-prefix').value.trim();
+                this.settings.ocrCorrection = document.getElementById('ocr-toggle').checked;
+                this.settings.formUrl = document.getElementById('form-url-input').value.trim();
+                localStorage.setItem('barra_settings', JSON.stringify(this.settings));
+            },
+
+            normalize(code) {
+                let clean = code.trim().toUpperCase().replace(/\s+/g, '');
+                if (this.settings.ocrCorrection) {
+                    clean = clean.replace(/O/g, '0').replace(/I/g, '1');
+                }
+                return clean;
+            },
+
+            convert(code, targetMode) {
+                const clean = this.normalize(code);
+                const fullP = this.settings.fullPrefix;
+                const shortP = this.settings.shortPrefix;
+
+                // Detect current format
+                const isFull = clean.startsWith(fullP);
+                const isShort = clean.startsWith(shortP) || (!isFull && /^[A-Z0-9]+$/.test(clean));
+
+                if (targetMode === 'SHORT') {
+                    if (isShort) return clean; // Already short
+                    if (isFull) {
+                        // Logic: Remove Full Prefix, Remove last 2 chars (checksum?), Prepend Short Prefix
+                        // Example: 02PI20 2308508 22 -> MUSTBRUN 2308508
+                        const core = clean.substring(fullP.length, clean.length - 2); 
+                        return shortP + core;
+                    }
+                } else { // Target FULL
+                    if (isFull) return clean;
+                    if (isShort) {
+                        // Logic: Remove Short Prefix, Prepend Full Prefix, Add dummy checksum '00'
+                        let core = clean;
+                        if (clean.startsWith(shortP)) core = clean.substring(shortP.length);
+                        return fullP + core + '00'; 
+                    }
+                }
+                return null; // Conversion failed
+            },
+
+            validate(code, mode) {
+                const clean = this.normalize(code);
+                if (clean.length < 5) return false;
+                if (mode === 'FULL' && !clean.startsWith(this.settings.fullPrefix)) return false;
+                return true;
             }
-            const jsonContent = JSON.stringify(scannedHistory, null, 2);
-            const blob = new Blob([jsonContent], { type: 'application/json' });
-            const url = URL.createObjectURL(blob);
-            const link = document.createElement("a");
-            link.setAttribute("href", url);
-            link.setAttribute("download", `activos_scan_${new Date().toISOString().slice(0,10)}.json`);
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-        }
+        };
 
-        function startScanner() {
-            if (typeof Html5QrcodeScanner === 'undefined') {
-                console.error("Librería Html5QrcodeScanner no cargada.");
-                return;
-            }
+        // --- 3. APP CONTROLLER ---
+        const app = {
+            mode: 'FULL', // FULL or SHORT
+            scans: [],
+            tempScan: null,
+            filter: 'all',
+            scanner: null,
 
-            if (!html5QrcodeScanner) {
-                html5QrcodeScanner = new Html5QrcodeScanner(
+            async init() {
+                await db.init();
+                logic.loadSettings();
+                this.bindEvents();
+                this.loadScans();
+                this.startScanner();
+                this.updateOnlineStatus();
+            },
+
+            bindEvents() {
+                document.getElementById('settings-btn').onclick = () => document.getElementById('settings-modal').style.display = 'flex';
+                document.getElementById('sync-btn').onclick = () => this.openSyncModal();
+                document.getElementById('search-input').oninput = (e) => this.renderList(e.target.value);
+                
+                // Settings inputs save on blur
+                document.querySelectorAll('.setting-input').forEach(el => el.onblur = () => logic.saveSettings());
+                document.getElementById('ocr-toggle').onchange = () => logic.saveSettings();
+
+                window.addEventListener('online', () => this.updateOnlineStatus());
+                window.addEventListener('offline', () => this.updateOnlineStatus());
+            },
+
+            updateOnlineStatus() {
+                const badge = document.getElementById('offline-badge');
+                badge.style.display = navigator.onLine ? 'none' : 'block';
+            },
+
+            setMode(newMode) {
+                this.mode = newMode;
+                document.getElementById('mode-full').className = `mode-btn ${newMode === 'FULL' ? 'active' : ''}`;
+                document.getElementById('mode-short').className = `mode-btn ${newMode === 'SHORT' ? 'active' : ''}`;
+            },
+
+            async loadScans() {
+                this.scans = await db.getAll();
+                this.renderList();
+            },
+
+            renderList(searchTerm = '') {
+                const list = document.getElementById('log-content');
+                list.innerHTML = '';
+                
+                const term = searchTerm.toLowerCase();
+                const filtered = this.scans
+                    .filter(s => {
+                        if (this.filter === 'pending') return s.status === 'pending';
+                        if (this.filter === 'sent') return s.status === 'sent';
+                        return true;
+                    })
+                    .filter(s => s.code_normalized.toLowerCase().includes(term))
+                    .sort((a, b) => new Date(b.date) - new Date(a.date));
+
+                filtered.forEach(scan => {
+                    const li = document.createElement('li');
+                    li.className = 'log-item';
+                    li.innerHTML = `
+                        <div class="item-info">
+                            <div class="item-code">${scan.code_normalized}</div>
+                            <div class="item-meta">
+                                <span class="badge badge-${scan.pi_mode.toLowerCase()}">${scan.pi_mode}</span>
+                                <span class="badge badge-${scan.status}">${scan.status}</span>
+                                ${scan.used ? '<span class="badge badge-used">USED</span>' : ''}
+                                <span>${new Date(scan.date).toLocaleTimeString()}</span>
+                            </div>
+                        </div>
+                    `;
+                    
+                    // Duplicate/Used Logic
+                    if (!scan.used) {
+                        const btn = document.createElement('button');
+                        btn.className = 'btn-secondary';
+                        btn.style.padding = '6px 10px';
+                        btn.style.fontSize = '0.8rem';
+                        btn.innerText = 'Mark Used';
+                        btn.onclick = async () => {
+                            await db.markUsed(scan.id);
+                            this.loadScans();
+                        };
+                        li.appendChild(btn);
+                    }
+                    
+                    list.appendChild(li);
+                });
+            },
+
+            filterList(type) {
+                this.filter = type;
+                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                event.target.classList.add('active');
+                this.renderList(document.getElementById('search-input').value);
+            },
+
+            // --- SCAN LOGIC ---
+            onScan(rawCode) {
+                const feedback = document.getElementById('scan-feedback');
+                
+                // 1. Normalize
+                const normalized = logic.normalize(rawCode);
+                
+                // 2. Validate
+                if (!logic.validate(normalized, this.mode)) {
+                    feedback.innerText = `Invalid ${this.mode} format`;
+                    feedback.style.color = 'var(--danger-color)';
+                    document.body.classList.add('blink-error');
+                    setTimeout(() => document.body.classList.remove('blink-error'), 400);
+                    return;
+                }
+
+                // 3. Convert (if needed)
+                let finalCode = logic.convert(normalized, this.mode);
+                if (!finalCode) {
+                    // Fallback: if conversion fails but valid, keep normalized
+                    finalCode = normalized; 
+                }
+
+                // 4. Duplicate Check
+                const duplicate = this.scans.find(s => s.code_normalized === finalCode);
+                if (duplicate) {
+                    feedback.innerText = `Duplicate: ${finalCode}`;
+                    feedback.style.color = 'var(--warning-color)';
+                    if(navigator.vibrate) navigator.vibrate([50, 50, 50]);
+                    return;
+                }
+
+                // 5. Success -> Ask Layout
+                this.tempScan = finalCode;
+                document.getElementById('layout-prompt-code').innerText = finalCode;
+                document.getElementById('layout-modal').style.display = 'flex';
+                if(navigator.vibrate) navigator.vibrate(100);
+            },
+
+            async confirmScan(layout) {
+                const record = {
+                    code_original: this.tempScan, // simplified for now
+                    code_normalized: this.tempScan,
+                    pi_mode: this.mode,
+                    layout: layout,
+                    date: new Date().toISOString(),
+                    used: false,
+                    dateUsed: null,
+                    status: 'pending'
+                };
+
+                await db.addScan(record);
+                this.loadScans();
+                document.getElementById('layout-modal').style.display = 'none';
+                document.getElementById('scan-feedback').innerText = `Saved: ${this.tempScan}`;
+                document.getElementById('scan-feedback').style.color = 'var(--success-color)';
+            },
+
+            cancelScan() {
+                document.getElementById('layout-modal').style.display = 'none';
+            },
+
+            // --- SYNC LOGIC ---
+            openSyncModal() {
+                const pending = this.scans.filter(s => s.status === 'pending');
+                const container = document.getElementById('sync-list');
+                container.innerHTML = '';
+
+                if (pending.length === 0) {
+                    container.innerHTML = '<div style="text-align:center; padding:20px; color:#888;">No pending items.</div>';
+                } else {
+                    pending.forEach(item => {
+                        const div = document.createElement('div');
+                        div.style.cssText = 'display:flex; justify-content:space-between; align-items:center; padding:10px; border-bottom:1px solid #333;';
+                        
+                        const info = document.createElement('span');
+                        info.innerText = item.code_normalized;
+                        
+                        const actions = document.createElement('div');
+                        actions.style.display = 'flex';
+                        actions.style.gap = '8px';
+
+                        const btnOpen = document.createElement('button');
+                        btnOpen.className = 'btn-primary';
+                        btnOpen.style.padding = '6px 12px';
+                        btnOpen.style.fontSize = '0.8rem';
+                        btnOpen.innerText = 'Open Form';
+                        btnOpen.onclick = () => this.openForm(item);
+
+                        const btnMark = document.createElement('button');
+                        btnMark.className = 'btn-secondary';
+                        btnMark.style.padding = '6px 12px';
+                        btnMark.style.fontSize = '0.8rem';
+                        btnMark.innerText = 'Mark Sent';
+                        btnMark.onclick = async () => {
+                            await db.updateStatus(item.id, 'sent');
+                            this.openSyncModal(); // refresh
+                            this.loadScans();
+                        };
+
+                        actions.appendChild(btnOpen);
+                        actions.appendChild(btnMark);
+                        div.appendChild(info);
+                        div.appendChild(actions);
+                        container.appendChild(div);
+                    });
+                }
+                document.getElementById('sync-modal').style.display = 'flex';
+            },
+
+            openForm(item) {
+                let url = logic.settings.formUrl;
+                if (!url) {
+                    alert('Please configure Form URL in Settings first.');
+                    return;
+                }
+                // Replace placeholders
+                url = url.replace('{{CODE}}', item.code_normalized)
+                         .replace('{{MODE}}', item.pi_mode)
+                         .replace('{{LAYOUT}}', item.layout);
+                
+                window.open(url, '_blank');
+            },
+
+            exportCSV() {
+                const headers = ['ID', 'Code', 'Mode', 'Layout', 'Date', 'Status', 'Used'];
+                const rows = this.scans.map(s => [
+                    s.id, s.code_normalized, s.pi_mode, s.layout, s.date, s.status, s.used
+                ]);
+                
+                const csvContent = [
+                    headers.join(','),
+                    ...rows.map(r => r.join(','))
+                ].join('\n');
+
+                const blob = new Blob([csvContent], { type: 'text/csv' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `barra_export_${new Date().toISOString().slice(0,10)}.csv`;
+                a.click();
+            },
+
+            async clearDatabase() {
+                if(confirm('Are you sure? This will delete ALL history.')) {
+                    await db.clear();
+                    this.loadScans();
+                }
+            },
+
+            startScanner() {
+                this.scanner = new Html5QrcodeScanner(
                     "reader", { 
-                    fps: 50, // Máxima velocidad de cuadros para S24
-                    qrbox: {width: 300, height: 150},
+                    fps: 30, 
+                    qrbox: {width: 280, height: 150},
                     formatsToSupport: [
                         Html5QrcodeSupportedFormats.QR_CODE,
                         Html5QrcodeSupportedFormats.CODE_128,
@@ -591,145 +676,23 @@
                         Html5QrcodeSupportedFormats.EAN_13,
                         Html5QrcodeSupportedFormats.UPC_A
                     ],
-                    experimentalFeatures: {
-                        useBarCodeDetectorIfSupported: true
-                    },
                     videoConstraints: { 
-                        facingMode: "environment", 
-                        width: { min: 640, ideal: 1920, max: 3840 },
-                        height: { min: 480, ideal: 1080, max: 2160 },
+                        facingMode: "environment",
+                        width: { ideal: 1920 },
+                        height: { ideal: 1080 },
                         advanced: [{ focusMode: "continuous" }]
                     }
-                    }, 
-                    false
+                }, false);
+                
+                this.scanner.render(
+                    (decodedText) => this.onScan(decodedText),
+                    (error) => { /* ignore frame errors */ }
                 );
             }
-            
-            if(pauseBtn) {
-                pauseBtn.textContent = "⏸️";
-                pauseBtn.title = "Pausar Escáner";
-            }
-            isPaused = false;
+        };
 
-            html5QrcodeScanner.render(onScanSuccess).catch(err => {
-                console.error(`ERROR AL INICIAR CÁMARA: ${err}`);
-                document.getElementById('reader-error').innerHTML = `<b>Error de Cámara:</b> No se pudo iniciar. <br>Por favor, otorga los permisos y asegúrate de que no esté en uso.`;
-                document.getElementById('reader-error').style.display = 'block';
-            });
-        }
-
-        // --- Event Listeners ---
-        document.addEventListener('DOMContentLoaded', () => {
-            // 1. Cargar datos (con protección contra errores)
-            try { loadSettings(); } catch(e) { console.error("Error cargando ajustes:", e); }
-            try { loadHistory(); } catch(e) { console.error("Error cargando historial:", e); }
-
-            // 2. Configurar Listeners (ANTES del escáner para asegurar que funcionen)
-            document.getElementById('settings-btn').addEventListener('click', () => {
-                settingsModal.style.display = 'flex';
-            });
-            document.getElementById('close-modal-btn').addEventListener('click', () => {
-                settingsModal.style.display = 'none';
-            });
-            document.getElementById('clear-history-btn').addEventListener('click', clearHistory);
-            
-            // Nuevo botón de basura en header
-            const trashBtn = document.getElementById('trash-btn');
-            if(trashBtn) trashBtn.addEventListener('click', clearHistory);
-
-            // Botón de Pausa/Reanudar
-            if(pauseBtn) {
-                pauseBtn.addEventListener('click', () => {
-                    if (!html5QrcodeScanner) return;
-                    
-                    if (isPaused) {
-                        startScanner();
-                    } else {
-                        html5QrcodeScanner.clear().then(() => {
-                            const readerDiv = document.getElementById('reader');
-                            readerDiv.innerHTML = '<div style="display:flex; flex-direction:column; justify-content:center; align-items:center; height:200px; background:#000; color:#666;"><div style="font-size:2rem; margin-bottom:10px;">⏸️</div><div>Pausado</div></div>';
-                            pauseBtn.textContent = "▶️";
-                            pauseBtn.title = "Reanudar Escáner";
-                            isPaused = true;
-                        }).catch(err => console.error("Error al pausar:", err));
-                    }
-                });
-            }
-
-            document.getElementById('export-csv-btn').addEventListener('click', exportToCSV);
-            document.getElementById('export-json-btn').addEventListener('click', exportToJSON);
-            document.getElementById('open-sheet-btn').addEventListener('click', () => {
-                window.open(GOOGLE_SHEET_VIEW_URL, '_blank');
-            });
-            
-            document.getElementById('test-connection-btn').addEventListener('click', async () => {
-                if (!hasValidWebAppUrl()) {
-                    alert("Error: No hay una URL de Web App configurada.");
-                    return;
-                }
-                const btn = document.getElementById('test-connection-btn');
-                const originalText = btn.textContent;
-                btn.textContent = "Enviando...";
-                btn.disabled = true;
-                
-                try {
-                    await syncHistoryToGoogleSheet();
-                    alert("✅ Datos enviados. Verifica tu Google Sheet.");
-                } catch (e) {
-                    alert("❌ Error de conexión: " + e.message);
-                } finally {
-                    btn.textContent = originalText;
-                    btn.disabled = false;
-                }
-            });
-            
-            // Listeners para edición
-            document.getElementById('close-edit-btn').addEventListener('click', () => editModal.style.display = 'none');
-            document.getElementById('save-edit-btn').addEventListener('click', saveEdit);
-            document.getElementById('delete-item-btn').addEventListener('click', deleteItem);
-
-            // Listener para el buscador
-            searchInput.addEventListener('input', filterList);
-
-            function filterList() {
-                const term = searchInput.value.toLowerCase();
-                const items = log.getElementsByTagName('li');
-                Array.from(items).forEach(item => {
-                    const text = item.textContent.toLowerCase();
-                    item.style.display = text.includes(term) ? 'flex' : 'none';
-                });
-            }
-
-            soundToggle.addEventListener('change', (e) => {
-                settings.sound = e.target.checked;
-                saveSettings();
-            });
-            vibrationToggle.addEventListener('change', (e) => {
-                settings.vibration = e.target.checked;
-                saveSettings();
-            });
-            stopScanToggle.addEventListener('change', (e) => {
-                settings.stopOnScan = e.target.checked;
-                saveSettings();
-            });
-            
-            sheetUrlInput.addEventListener('change', (e) => {
-                const val = e.target.value.trim();
-                settings.sheetWebAppUrl = val;
-                saveSettings();
-                updateConnectionStatus();
-                if (val && !hasValidWebAppUrl()) {
-                    if (val.includes("docs.google.com/spreadsheets")) {
-                        showSyncMessage('Error: Pegaste la URL de la hoja. Necesitas la URL del Script (/exec).', true);
-                    } else {
-                        showSyncMessage('URL inválida. Asegúrate de copiar la URL de la Web App.', true);
-                    }
-                }
-            });
-
-            // 3. Iniciar Escáner
-            startScanner();
-        });
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => app.init());
     </script>
 </body>
 </html>
