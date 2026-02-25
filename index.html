@@ -135,6 +135,10 @@
                     <span class="slider"></span>
                 </label>
             </div>
+            <div class="setting-item" style="display:block; margin-top:10px;">
+                <span style="display:block; margin-bottom:8px; font-size:0.9rem; color:#ccc;">URL del Script de Google (Web App)</span>
+                <input type="text" id="sheet-url-input" placeholder="Pega aquí la URL de tu Web App..." style="width:100%; padding:10px; background:#333; border:1px solid #555; color:white; border-radius:8px; box-sizing:border-box; font-size:0.85rem;">
+            </div>
             <hr style="border-color: #444; margin: 25px 0;">
             <button id="open-sheet-btn" class="btn btn-layout" style="margin-bottom: 0; padding: 10px 15px; font-size: 1rem;">Abrir Hoja de Google</button>
             <button id="export-csv-btn" class="btn btn-success">Exportar CSV</button>
@@ -180,14 +184,15 @@
         let currentEditIndex = -1;
         let tempScannedCode = "";
         let isProcessing = false;
-        const GOOGLE_SHEET_URL = "https://docs.google.com/spreadsheets/d/1_VT_QFvuObqWvA-4vngm7u_KBhfIA1AmP-BOjzncJwY/edit?usp=sharing";
-        const GOOGLE_SHEET_WEBAPP_URL = ""; // Pega aqui tu URL de Web App (Apps Script /exec)
+        // URL de la hoja para el botón "Abrir"
+        const GOOGLE_SHEET_VIEW_URL = "https://docs.google.com/spreadsheets/d/1_VT_QFvuObqWvA-4vngm7u_KBhfIA1AmP-BOjzncJwY/edit";
 
         const log = document.getElementById('log-content');
         const settingsModal = document.getElementById('settings-modal');
         const editModal = document.getElementById('edit-modal');
         const layoutModal = document.getElementById('layout-modal');
         const editInput = document.getElementById('edit-input');
+        const sheetUrlInput = document.getElementById('sheet-url-input');
         const soundToggle = document.getElementById('sound-toggle');
         const vibrationToggle = document.getElementById('vibration-toggle');
         const scanCountElement = document.getElementById('scan-count');
@@ -232,15 +237,19 @@
         }
 
         async function syncHistoryToGoogleSheet() {
-            if (!GOOGLE_SHEET_WEBAPP_URL) return;
+            if (!settings.sheetWebAppUrl) return;
 
             const payload = {
-                spreadsheetUrl: GOOGLE_SHEET_URL,
+                // Enviamos la fecha de actualización
                 updatedAt: new Date().toISOString(),
+                // Enviamos todos los registros
                 records: scannedHistory.map(normalizeRecord)
             };
 
-            await fetch(GOOGLE_SHEET_WEBAPP_URL, {
+            // Usamos no-cors porque Apps Script no soporta CORS en redirecciones fácilmente
+            // Esto significa que no sabremos si falló o tuvo éxito (status 0), 
+            // pero enviará los datos.
+            await fetch(settings.sheetWebAppUrl, {
                 method: 'POST',
                 mode: 'no-cors',
                 headers: { 'Content-Type': 'application/json' },
@@ -333,10 +342,12 @@
             settings = {
                 sound: true,
                 vibration: true,
+                sheetWebAppUrl: "",
                 ...savedSettings
             };
             soundToggle.checked = settings.sound;
             vibrationToggle.checked = settings.vibration;
+            sheetUrlInput.value = settings.sheetWebAppUrl || "";
         }
 
         function saveSettings() {
@@ -424,16 +435,24 @@
 
             const html5QrcodeScanner = new Html5QrcodeScanner(
                 "reader", { 
-                fps: 30, // Más rápido
+                fps: 50, // Máxima velocidad de cuadros para S24
                 qrbox: {width: 300, height: 150},
+                // Optimización: Limitar formatos acelera drásticamente la detección
+                formatsToSupport: [
+                    Html5QrcodeSupportedFormats.QR_CODE,
+                    Html5QrcodeSupportedFormats.CODE_128,
+                    Html5QrcodeSupportedFormats.CODE_39,
+                    Html5QrcodeSupportedFormats.EAN_13,
+                    Html5QrcodeSupportedFormats.UPC_A
+                ],
                 experimentalFeatures: {
                     useBarCodeDetectorIfSupported: true
                 },
                 // Usa 'ideal' para preferir la cámara trasera, pero permitir otras si no está disponible
                 videoConstraints: { 
                     facingMode: { ideal: "environment" },
-                    width: { min: 640, ideal: 1280, max: 1920 },
-                    height: { min: 480, ideal: 720, max: 1080 },
+                    width: { min: 640, ideal: 1920, max: 3840 }, // Mayor resolución para captar detalles finos
+                    height: { min: 480, ideal: 1080, max: 2160 },
                     advanced: [{ focusMode: "continuous" }]
                 }
                 }, 
@@ -457,7 +476,7 @@
             document.getElementById('clear-history-btn').addEventListener('click', clearHistory);
             document.getElementById('export-csv-btn').addEventListener('click', exportToCSV);
             document.getElementById('open-sheet-btn').addEventListener('click', () => {
-                window.open(GOOGLE_SHEET_URL, '_blank');
+                window.open(GOOGLE_SHEET_VIEW_URL, '_blank');
             });
             
             // Listeners para edición
@@ -471,6 +490,11 @@
             });
             vibrationToggle.addEventListener('change', (e) => {
                 settings.vibration = e.target.checked;
+                saveSettings();
+            });
+            
+            sheetUrlInput.addEventListener('change', (e) => {
+                settings.sheetWebAppUrl = e.target.value.trim();
                 saveSettings();
             });
         });
