@@ -133,7 +133,10 @@
     <div id="reader-error" style="color: #ef5350; margin-top: 15px; font-weight: 600; display: none; max-width: 400px; text-align: center;"></div>
     
     <div class="log-container" id="history">
-        <div class="log-header">Historial: <span id="scan-count">0</span></div>
+        <div class="log-header">
+            <div style="margin-bottom: 8px;">Historial: <span id="scan-count">0</span></div>
+            <input type="text" id="search-input" placeholder="🔍 Buscar activo..." style="width:100%; padding:8px; border-radius:6px; border:1px solid #444; background:#333; color:white; box-sizing:border-box;">
+        </div>
         <ul id="log-content"></ul>
     </div>
 
@@ -233,6 +236,7 @@
         const scanCountElement = document.getElementById('scan-count');
         const connectionStatusElement = document.getElementById('connection-status');
         const pauseBtn = document.getElementById('pause-btn');
+        const searchInput = document.getElementById('search-input');
 
         // Renderizado completo del historial
         function renderHistory() {
@@ -250,10 +254,30 @@
                 
                 li.innerHTML = `<span class="success">[✔] REGISTRADO:</span> ${displayCode} ${displayLayout}`;
                 
-                // Evento para editar/eliminar
+                // Evento Click para editar
                 li.onclick = () => openEditModal(realIndex);
+
+                // Evento Swipe (Deslizar) para archivar
+                let touchStartX = 0;
+                li.addEventListener('touchstart', e => {
+                    touchStartX = e.changedTouches[0].screenX;
+                }, {passive: true});
+                
+                li.addEventListener('touchend', e => {
+                    const touchEndX = e.changedTouches[0].screenX;
+                    // Si desliza más de 100px a la izquierda
+                    if (touchStartX - touchEndX > 100) { 
+                        if(confirm("¿Archivar este registro?")) {
+                            scannedHistory.splice(realIndex, 1);
+                            persistHistory();
+                            renderHistory();
+                        }
+                    }
+                }, {passive: true});
+
                 log.appendChild(li);
             });
+            filterList(); // Aplicar filtro si hay texto en el buscador
             updateCount();
         }
 
@@ -663,6 +687,18 @@
             document.getElementById('close-edit-btn').addEventListener('click', () => editModal.style.display = 'none');
             document.getElementById('save-edit-btn').addEventListener('click', saveEdit);
             document.getElementById('delete-item-btn').addEventListener('click', deleteItem);
+
+            // Listener para el buscador
+            searchInput.addEventListener('input', filterList);
+
+            function filterList() {
+                const term = searchInput.value.toLowerCase();
+                const items = log.getElementsByTagName('li');
+                Array.from(items).forEach(item => {
+                    const text = item.textContent.toLowerCase();
+                    item.style.display = text.includes(term) ? 'flex' : 'none';
+                });
+            }
 
             soundToggle.addEventListener('change', (e) => {
                 settings.sound = e.target.checked;
