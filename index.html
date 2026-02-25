@@ -136,6 +136,7 @@
                 </label>
             </div>
             <hr style="border-color: #444; margin: 25px 0;">
+            <button id="open-sheet-btn" class="btn btn-layout" style="margin-bottom: 0; padding: 10px 15px; font-size: 1rem;">Abrir Hoja de Google</button>
             <button id="export-csv-btn" class="btn btn-success">Exportar CSV</button>
             <button id="clear-history-btn" class="btn btn-danger">Borrar Historial</button>
             <button id="close-modal-btn" class="btn btn-close">Cerrar</button>
@@ -180,7 +181,7 @@
         let tempScannedCode = "";
         let isProcessing = false;
         const GOOGLE_SHEET_URL = "https://docs.google.com/spreadsheets/d/1_VT_QFvuObqWvA-4vngm7u_KBhfIA1AmP-BOjzncJwY/edit?usp=sharing";
-        const GOOGLE_SHEET_WEBAPP_URL = "";
+        const GOOGLE_SHEET_WEBAPP_URL = ""; // Pega aqui tu URL de Web App (Apps Script /exec)
 
         const log = document.getElementById('log-content');
         const settingsModal = document.getElementById('settings-modal');
@@ -239,19 +240,16 @@
                 records: scannedHistory.map(normalizeRecord)
             };
 
-            const response = await fetch(GOOGLE_SHEET_WEBAPP_URL, {
+            await fetch(GOOGLE_SHEET_WEBAPP_URL, {
                 method: 'POST',
+                mode: 'no-cors',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
             });
-
-            if (!response.ok) {
-                throw new Error(`No se pudo sincronizar (${response.status})`);
-            }
         }
 
         function persistHistory() {
-            persistHistory();
+            localStorage.setItem('asset_history', JSON.stringify(scannedHistory));
             syncHistoryToGoogleSheet().catch((error) => {
                 console.error('Error sincronizando Google Sheets:', error);
             });
@@ -452,6 +450,9 @@
             });
             document.getElementById('clear-history-btn').addEventListener('click', clearHistory);
             document.getElementById('export-csv-btn').addEventListener('click', exportToCSV);
+            document.getElementById('open-sheet-btn').addEventListener('click', () => {
+                window.open(GOOGLE_SHEET_URL, '_blank');
+            });
             
             // Listeners para ediciÃ³n
             document.getElementById('close-edit-btn').addEventListener('click', () => editModal.style.display = 'none');
