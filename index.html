@@ -175,6 +175,19 @@
         .btn-secondary { background: #3a3a3c; color: white; }
         .btn-danger { background: rgba(255, 69, 58, 0.15); color: var(--danger-color); }
         
+        /* --- BATCH CONTROLS --- */
+        .batch-controls {
+            display: flex; justify-content: space-between; align-items: center;
+            background: var(--card-bg); padding: 12px 16px; border-radius: 12px;
+            margin-bottom: 16px; width: 100%; max-width: 600px; box-sizing: border-box;
+        }
+        .batch-select {
+            background: #2c2c2e; color: white; border: 1px solid #444;
+            padding: 6px 12px; border-radius: 8px; font-size: 0.9rem;
+        }
+        .batch-select:disabled { opacity: 0.5; }
+        .batch-label { font-weight: 600; font-size: 0.95rem; display: flex; align-items: center; gap: 10px; }
+
         .help-text { font-size: 0.8rem; color: var(--text-secondary); margin-top: 4px; line-height: 1.4; }
     </style>
 </head>
@@ -196,6 +209,19 @@
     <div class="mode-selector">
         <button class="mode-btn active" id="mode-full" onclick="app.setMode('FULL')">FULL PI</button>
         <button class="mode-btn" id="mode-short" onclick="app.setMode('SHORT')">SHORT</button>
+    </div>
+
+    <!-- BATCH MODE CONTROLS -->
+    <div class="batch-controls">
+        <div class="batch-label">
+            <span>Batch Mode</span>
+            <label class="switch"><input type="checkbox" id="batch-toggle" onchange="app.toggleBatchMode()"><span class="slider"></span></label>
+        </div>
+        <select id="batch-layout" class="batch-select" onchange="app.setBatchLayout(this.value)" disabled>
+            <option value="QWERTY">QWERTY</option>
+            <option value="AZERTY">AZERTY</option>
+            <option value="QWERTZU">QWERTZU</option>
+        </select>
     </div>
 
     <!-- SCANNER -->
@@ -220,6 +246,11 @@
         <div class="modal-content">
             <h3>Settings</h3>
             
+            <div class="setting-group">
+                <label class="setting-label">Google Apps Script URL</label>
+                <input type="text" id="script-url-input" class="setting-input" placeholder="https://script.google.com/.../exec">
+            </div>
+
             <div class="setting-group">
                 <label class="setting-label">Google Form Prefill Link</label>
                 <input type="text" id="form-url-input" class="setting-input" placeholder="https://docs.google.com/forms/d/e/.../viewform?entry.123={{CODE}}">
@@ -259,6 +290,7 @@
         <div class="modal-content">
             <h3>Sync Pending</h3>
             <p class="help-text">Click "Open Form" to submit data. Then click "Mark Sent".</p>
+            <button class="btn btn-primary" onclick="app.syncToScript()" style="margin-bottom: 15px; background-color: #0097a7;">🚀 Sync to Cloud (Direct)</button>
             <div id="sync-list" style="max-height: 300px; overflow-y: auto; margin: 10px 0;"></div>
             <button class="btn btn-secondary" onclick="document.getElementById('sync-modal').style.display='none'">Close</button>
         </div>
@@ -347,7 +379,8 @@
                 fullPrefix: '02PI20',
                 shortPrefix: 'MUSTBRUN',
                 ocrCorrection: true,
-                formUrl: ''
+                formUrl: '',
+                scriptUrl: 'https://script.google.com/macros/s/AKfycbzAGUpxnCXDsr7llJlh_75rKdnwd5xJJIxWJVXy9ekUzqII6lTCpAiKVuYVfGQ_V8dWwA/exec'
             },
 
             loadSettings() {
@@ -359,6 +392,7 @@
                 document.getElementById('short-prefix').value = this.settings.shortPrefix;
                 document.getElementById('ocr-toggle').checked = this.settings.ocrCorrection;
                 document.getElementById('form-url-input').value = this.settings.formUrl;
+                document.getElementById('script-url-input').value = this.settings.scriptUrl || '';
             },
 
             saveSettings() {
@@ -366,13 +400,15 @@
                 this.settings.shortPrefix = document.getElementById('short-prefix').value.trim();
                 this.settings.ocrCorrection = document.getElementById('ocr-toggle').checked;
                 this.settings.formUrl = document.getElementById('form-url-input').value.trim();
+                this.settings.scriptUrl = document.getElementById('script-url-input').value.trim();
                 localStorage.setItem('barra_settings', JSON.stringify(this.settings));
             },
 
             normalize(code) {
                 let clean = code.trim().toUpperCase().replace(/\s+/g, '');
                 if (this.settings.ocrCorrection) {
-                    clean = clean.replace(/O/g, '0').replace(/I/g, '1');
+                    // Fix: Only replace O->0. I->1 breaks '02PI' prefix.
+                    clean = clean.replace(/O/g, '0');
                 }
                 return clean;
             },
@@ -421,6 +457,8 @@
             tempScan: null,
             filter: 'all',
             scanner: null,
+            batchMode: false,
+            batchLayout: 'QWERTY',
             laserSound: new Audio("https://assets.mixkit.co/active_storage/sfx/600/600-preview.mp3"),
 
             async init() {
@@ -454,6 +492,15 @@
                 this.mode = newMode;
                 document.getElementById('mode-full').className = `mode-btn ${newMode === 'FULL' ? 'active' : ''}`;
                 document.getElementById('mode-short').className = `mode-btn ${newMode === 'SHORT' ? 'active' : ''}`;
+            },
+
+            toggleBatchMode() {
+                this.batchMode = document.getElementById('batch-toggle').checked;
+                document.getElementById('batch-layout').disabled = !this.batchMode;
+            },
+
+            setBatchLayout(layout) {
+                this.batchLayout = layout;
             },
 
             async loadScans() {
@@ -522,20 +569,19 @@
                 // 1. Normalize
                 const normalized = logic.normalize(rawCode);
                 
-                // 2. Validate
-                if (!logic.validate(normalized, this.mode)) {
+                // 2. Convert (Try to convert to current mode BEFORE validation)
+                let finalCode = logic.convert(normalized, this.mode);
+                if (!finalCode) {
+                    finalCode = normalized; 
+                }
+
+                // 3. Validate (Validate the RESULT of conversion)
+                if (!logic.validate(finalCode, this.mode)) {
                     feedback.innerText = `Invalid ${this.mode} format`;
                     feedback.style.color = 'var(--danger-color)';
                     document.body.classList.add('blink-error');
                     setTimeout(() => document.body.classList.remove('blink-error'), 400);
                     return;
-                }
-
-                // 3. Convert (if needed)
-                let finalCode = logic.convert(normalized, this.mode);
-                if (!finalCode) {
-                    // Fallback: if conversion fails but valid, keep normalized
-                    finalCode = normalized; 
                 }
 
                 // 4. Duplicate Check
@@ -544,6 +590,13 @@
                     feedback.innerText = `Duplicate: ${finalCode}`;
                     feedback.style.color = 'var(--warning-color)';
                     if(navigator.vibrate) navigator.vibrate([50, 50, 50]);
+                    return;
+                }
+
+                // 5. Batch Mode Check
+                if (this.batchMode) {
+                    this.tempScan = finalCode;
+                    this.confirmScan(this.batchLayout);
                     return;
                 }
 
@@ -572,7 +625,10 @@
 
                 await db.addScan(record);
                 this.loadScans();
-                document.getElementById('layout-modal').style.display = 'none';
+                
+                if (!this.batchMode) {
+                    document.getElementById('layout-modal').style.display = 'none';
+                }
                 document.getElementById('scan-feedback').innerText = `Saved: ${this.tempScan}`;
                 document.getElementById('scan-feedback').style.color = 'var(--success-color)';
             },
@@ -641,6 +697,42 @@
                          .replace('{{LAYOUT}}', item.layout);
                 
                 window.open(url, '_blank');
+            },
+
+            async syncToScript() {
+                const pending = this.scans.filter(s => s.status === 'pending');
+                if (pending.length === 0) { alert('No pending items to sync.'); return; }
+
+                const url = logic.settings.scriptUrl;
+                if (!url) { alert('Please configure Google Apps Script URL in Settings.'); return; }
+
+                const btn = document.querySelector('#sync-modal .btn-primary');
+                const originalText = btn.innerText;
+                btn.innerText = 'Sending...';
+                btn.disabled = true;
+
+                try {
+                    // Send data using no-cors (opaque response)
+                    await fetch(url, {
+                        method: 'POST',
+                        mode: 'no-cors',
+                        headers: { 'Content-Type': 'text/plain' }, // text/plain avoids preflight
+                        body: JSON.stringify({ records: pending })
+                    });
+
+                    // Assume success if no network error
+                    for (const item of pending) {
+                        await db.updateStatus(item.id, 'sent');
+                    }
+                    this.loadScans();
+                    this.openSyncModal(); // Refresh list
+                    alert('Sync initiated! Check your Google Sheet.');
+                } catch (e) {
+                    alert('Sync failed: ' + e.message);
+                } finally {
+                    btn.innerText = originalText;
+                    btn.disabled = false;
+                }
             },
 
             exportCSV() {
