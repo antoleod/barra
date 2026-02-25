@@ -100,12 +100,28 @@
             0% { top: 0; } 50% { top: 100%; } 100% { top: 0; }
         }
 
+        /* Status Indicator */
+        .status-indicator {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background-color: #ef5350; /* Red */
+            transition: background-color 0.3s, box-shadow 0.3s;
+        }
+        .status-connected {
+            background-color: #66bb6a; /* Green */
+            box-shadow: 0 0 8px #66bb6a;
+        }
+
     </style>
 </head>
 <body>
 
     <div class="header-container">
-        <h2>🛡️ Registro de Activos</h2>
+        <div style="display:flex; align-items:center; gap:10px;">
+            <div id="connection-status" class="status-indicator" title="Sin conexión a Google Sheets"></div>
+            <h2>🛡️ Registro de Activos</h2>
+        </div>
         <span class="settings-icon" id="settings-btn">⚙️</span>
     </div>
 
@@ -138,6 +154,9 @@
             <div class="setting-item" style="display:block; margin-top:10px;">
                 <span style="display:block; margin-bottom:8px; font-size:0.9rem; color:#ccc;">URL del Script de Google (Web App)</span>
                 <input type="text" id="sheet-url-input" placeholder="Pega aquí la URL de tu Web App..." style="width:100%; padding:10px; background:#333; border:1px solid #555; color:white; border-radius:8px; box-sizing:border-box; font-size:0.85rem;">
+                <small style="display:block; margin-top:5px; color:#aaa; font-size:0.75rem; line-height: 1.4;">
+                    Nota: No es la URL de la hoja. En tu Google Sheet ve a <b>Extensiones > Apps Script > Implementar > Aplicación Web</b> y copia la URL que termina en <code>/exec</code>.
+                </small>
             </div>
             <hr style="border-color: #444; margin: 25px 0;">
             <button id="open-sheet-btn" class="btn btn-layout" style="margin-bottom: 0; padding: 10px 15px; font-size: 1rem;">Abrir Hoja de Google</button>
@@ -185,7 +204,7 @@
         let tempScannedCode = "";
         let isProcessing = false;
         // URL de la hoja para el botón "Abrir"
-        const GOOGLE_SHEET_VIEW_URL = "https://docs.google.com/spreadsheets/d/1_VT_QFvuObqWvA-4vngm7u_KBhfIA1AmP-BOjzncJwY/edit";
+        const GOOGLE_SHEET_VIEW_URL = "https://docs.google.com/spreadsheets/d/1_VT_QFvuObqWvA-4vngm7u_KBhfIA1AmP-BOjzncJwY/edit?usp=sharing";
 
         const log = document.getElementById('log-content');
         const settingsModal = document.getElementById('settings-modal');
@@ -196,6 +215,7 @@
         const soundToggle = document.getElementById('sound-toggle');
         const vibrationToggle = document.getElementById('vibration-toggle');
         const scanCountElement = document.getElementById('scan-count');
+        const connectionStatusElement = document.getElementById('connection-status');
 
         // Renderizado completo del historial
         function renderHistory() {
@@ -236,32 +256,53 @@
             };
         }
 
-        async function syncHistoryToGoogleSheet() {
-            if (!settings.sheetWebAppUrl) return;
+        function hasValidWebAppUrl() {
+            return Boolean(
+                settings.sheetWebAppUrl &&
+                /script\.google\.com\/macros\/s\/.+\/exec/.test(settings.sheetWebAppUrl)
+            );
+        }
 
-            const payload = {
-                // Enviamos la fecha de actualización
-                updatedAt: new Date().toISOString(),
-                // Enviamos todos los registros
-                records: scannedHistory.map(normalizeRecord)
-            };
+        function showSyncMessage(message, isError = false) {
+            const el = document.getElementById('reader-error');
+            el.innerHTML = message;
+            el.style.color = isError ? '#ef5350' : '#66bb6a';
+            el.style.display = 'block';
+            setTimeout(() => {
+                el.style.display = 'none';
+            }, 2600);
+        }
 
-            // Usamos no-cors porque Apps Script no soporta CORS en redirecciones fácilmente
-            // Esto significa que no sabremos si falló o tuvo éxito (status 0), 
-            // pero enviará los datos.
+        async function postToGoogleSheet(payload) {
+            if (!hasValidWebAppUrl()) return;
             await fetch(settings.sheetWebAppUrl, {
                 method: 'POST',
                 mode: 'no-cors',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
                 body: JSON.stringify(payload)
             });
         }
 
-        function persistHistory() {
-            localStorage.setItem('asset_history', JSON.stringify(scannedHistory));
-            syncHistoryToGoogleSheet().catch((error) => {
-                console.error('Error sincronizando Google Sheets:', error);
+        async function syncHistoryToGoogleSheet() {
+            await postToGoogleSheet({
+                action: 'replaceAll',
+                updatedAt: new Date().toISOString(),
+                records: scannedHistory.map(normalizeRecord)
             });
+        }
+
+        async function appendRecordToGoogleSheet(record) {
+            await postToGoogleSheet({
+                action: 'append',
+                updatedAt: new Date().toISOString(),
+                record: normalizeRecord(record)
+            });
+        }
+
+        function persistHistory(syncRemote = true) {
+            localStorage.setItem('asset_history', JSON.stringify(scannedHistory));
+            if (!syncRemote) return;
+            syncHistoryToGoogleSheet().catch((error) => console.error('Error sincronizando Google Sheets:', error));
         }
 
         function onScanSuccess(decodedText) {
@@ -320,7 +361,14 @@
             };
             
             scannedHistory.push(newRecord);
-            persistHistory();
+            persistHistory(false);
+            if (hasValidWebAppUrl()) {
+                appendRecordToGoogleSheet(newRecord).catch((error) => {
+                    console.error('Error enviando registro a Google Sheets:', error);
+                });
+            } else {
+                showSyncMessage('Configura la URL /exec del Apps Script para guardar en Google Sheets.', true);
+            }
             renderHistory();
             closeLayoutModal();
         }
@@ -336,6 +384,16 @@
             setTimeout(() => { isProcessing = false; }, 1000);
         }
 
+        function updateConnectionStatus() {
+            if (hasValidWebAppUrl()) {
+                connectionStatusElement.classList.add('status-connected');
+                connectionStatusElement.title = "Conectado a Google Sheets";
+            } else {
+                connectionStatusElement.classList.remove('status-connected');
+                connectionStatusElement.title = "Sin conexión: falta URL /exec de Apps Script";
+            }
+        }
+
         function loadSettings() {
             const savedSettings = JSON.parse(localStorage.getItem('scanner_settings'));
             // Por defecto, todo activado
@@ -348,6 +406,7 @@
             soundToggle.checked = settings.sound;
             vibrationToggle.checked = settings.vibration;
             sheetUrlInput.value = settings.sheetWebAppUrl || "";
+            updateConnectionStatus();
         }
 
         function saveSettings() {
@@ -494,8 +553,17 @@
             });
             
             sheetUrlInput.addEventListener('change', (e) => {
-                settings.sheetWebAppUrl = e.target.value.trim();
+                const val = e.target.value.trim();
+                settings.sheetWebAppUrl = val;
                 saveSettings();
+                updateConnectionStatus();
+                if (val && !hasValidWebAppUrl()) {
+                    if (val.includes("docs.google.com/spreadsheets")) {
+                        showSyncMessage('Error: Pegaste la URL de la hoja. Necesitas la URL del Script (/exec).', true);
+                    } else {
+                        showSyncMessage('URL inválida. Asegúrate de copiar la URL de la Web App.', true);
+                    }
+                }
             });
         });
     </script>
