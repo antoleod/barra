@@ -154,6 +154,13 @@
                     <span class="slider"></span>
                 </label>
             </div>
+            <div class="setting-item">
+                <span>Detener tras escanear</span>
+                <label class="switch">
+                    <input type="checkbox" id="stop-scan-toggle">
+                    <span class="slider"></span>
+                </label>
+            </div>
             <div class="setting-item" style="display:block; margin-top:10px;">
                 <span style="display:block; margin-bottom:8px; font-size:0.9rem; color:#ccc;">URL del Script de Google (Web App)</span>
                 <input type="text" id="sheet-url-input" placeholder="Pega aquí la URL de tu Web App..." style="width:100%; padding:10px; background:#333; border:1px solid #555; color:white; border-radius:8px; box-sizing:border-box; font-size:0.85rem;">
@@ -163,6 +170,7 @@
             </div>
             <hr style="border-color: #444; margin: 25px 0;">
             <button id="open-sheet-btn" class="btn btn-layout" style="margin-bottom: 0; padding: 10px 15px; font-size: 1rem;">Abrir Hoja de Google</button>
+            <button id="test-connection-btn" class="btn btn-layout" style="background-color: #0097a7; color: white;">Probar Conexión</button>
             <button id="export-csv-btn" class="btn btn-success">Exportar CSV</button>
             <button id="export-json-btn" class="btn btn-layout" style="background-color: #f57c00; color: white;">Exportar JSON</button>
             <button id="clear-history-btn" class="btn btn-danger">Borrar Historial</button>
@@ -207,6 +215,7 @@
         let currentEditIndex = -1;
         let tempScannedCode = "";
         let isProcessing = false;
+        let html5QrcodeScanner = null;
         // URL de la hoja para el botón "Abrir"
         const GOOGLE_SHEET_VIEW_URL = "https://docs.google.com/spreadsheets/d/1_VT_QFvuObqWvA-4vngm7u_KBhfIA1AmP-BOjzncJwY/edit?usp=sharing";
 
@@ -217,6 +226,7 @@
         const editInput = document.getElementById('edit-input');
         const sheetUrlInput = document.getElementById('sheet-url-input');
         const soundToggle = document.getElementById('sound-toggle');
+        const stopScanToggle = document.getElementById('stop-scan-toggle');
         const vibrationToggle = document.getElementById('vibration-toggle');
         const scanCountElement = document.getElementById('scan-count');
         const connectionStatusElement = document.getElementById('connection-status');
@@ -379,15 +389,23 @@
             };
             
             scannedHistory.push(newRecord);
-            persistHistory(false);
-            if (hasValidWebAppUrl()) {
-                appendRecordToGoogleSheet(newRecord).catch((error) => {
-                    console.error('Error enviando registro a Google Sheets:', error);
-                });
-            } else {
+            // Sincronizar todo el historial para asegurar compatibilidad con el script
+            persistHistory(true);
+
+            if (!hasValidWebAppUrl()) {
                 showSyncMessage('Configura la URL /exec del Apps Script para guardar en Google Sheets.', true);
             }
             renderHistory();
+
+            // Lógica para detener el escáner si la opción está activa
+            if (settings.stopOnScan && html5QrcodeScanner) {
+                html5QrcodeScanner.clear().then(() => {
+                    const readerDiv = document.getElementById('reader');
+                    readerDiv.innerHTML = '<div style="display:flex; justify-content:center; align-items:center; height:200px; background:#111;"><button id="resume-scan-btn" class="btn btn-success" style="width:auto; padding:15px 30px; font-size:1.1rem;">📷 Escanear Nuevo</button></div>';
+                    document.getElementById('resume-scan-btn').addEventListener('click', startScanner);
+                }).catch(err => console.error("Error al detener escáner", err));
+            }
+
             closeLayoutModal();
         }
 
@@ -418,10 +436,12 @@
             settings = {
                 sound: true,
                 vibration: true,
+                stopOnScan: false,
                 sheetWebAppUrl: "https://script.google.com/macros/s/AKfycbzAGUpxnCXDsr7llJlh_75rKdnwd5xJJIxWJVXy9ekUzqII6lTCpAiKVuYVfGQ_V8dWwA/exec",
                 ...savedSettings
             };
             soundToggle.checked = settings.sound;
+            stopScanToggle.checked = settings.stopOnScan;
             vibrationToggle.checked = settings.vibration;
             sheetUrlInput.value = settings.sheetWebAppUrl || "";
             updateConnectionStatus();
@@ -521,6 +541,45 @@
             document.body.removeChild(link);
         }
 
+        function startScanner() {
+            if (typeof Html5QrcodeScanner === 'undefined') {
+                console.error("Librería Html5QrcodeScanner no cargada.");
+                return;
+            }
+
+            if (!html5QrcodeScanner) {
+                html5QrcodeScanner = new Html5QrcodeScanner(
+                    "reader", { 
+                    fps: 50, // Máxima velocidad de cuadros para S24
+                    qrbox: {width: 300, height: 150},
+                    formatsToSupport: [
+                        Html5QrcodeSupportedFormats.QR_CODE,
+                        Html5QrcodeSupportedFormats.CODE_128,
+                        Html5QrcodeSupportedFormats.CODE_39,
+                        Html5QrcodeSupportedFormats.EAN_13,
+                        Html5QrcodeSupportedFormats.UPC_A
+                    ],
+                    experimentalFeatures: {
+                        useBarCodeDetectorIfSupported: true
+                    },
+                    videoConstraints: { 
+                        facingMode: "environment", 
+                        width: { min: 640, ideal: 1920, max: 3840 },
+                        height: { min: 480, ideal: 1080, max: 2160 },
+                        advanced: [{ focusMode: "continuous" }]
+                    }
+                    }, 
+                    false
+                );
+            }
+            
+            html5QrcodeScanner.render(onScanSuccess).catch(err => {
+                console.error(`ERROR AL INICIAR CÁMARA: ${err}`);
+                document.getElementById('reader-error').innerHTML = `<b>Error de Cámara:</b> No se pudo iniciar. <br>Por favor, otorga los permisos y asegúrate de que no esté en uso.`;
+                document.getElementById('reader-error').style.display = 'block';
+            });
+        }
+
         // --- Event Listeners ---
         document.addEventListener('DOMContentLoaded', () => {
             // 1. Cargar datos (con protección contra errores)
@@ -546,6 +605,27 @@
                 window.open(GOOGLE_SHEET_VIEW_URL, '_blank');
             });
             
+            document.getElementById('test-connection-btn').addEventListener('click', async () => {
+                if (!hasValidWebAppUrl()) {
+                    alert("Error: No hay una URL de Web App configurada.");
+                    return;
+                }
+                const btn = document.getElementById('test-connection-btn');
+                const originalText = btn.textContent;
+                btn.textContent = "Enviando...";
+                btn.disabled = true;
+                
+                try {
+                    await syncHistoryToGoogleSheet();
+                    alert("✅ Datos enviados. Verifica tu Google Sheet.");
+                } catch (e) {
+                    alert("❌ Error de conexión: " + e.message);
+                } finally {
+                    btn.textContent = originalText;
+                    btn.disabled = false;
+                }
+            });
+            
             // Listeners para edición
             document.getElementById('close-edit-btn').addEventListener('click', () => editModal.style.display = 'none');
             document.getElementById('save-edit-btn').addEventListener('click', saveEdit);
@@ -557,6 +637,10 @@
             });
             vibrationToggle.addEventListener('change', (e) => {
                 settings.vibration = e.target.checked;
+                saveSettings();
+            });
+            stopScanToggle.addEventListener('change', (e) => {
+                settings.stopOnScan = e.target.checked;
                 saveSettings();
             });
             
@@ -575,42 +659,7 @@
             });
 
             // 3. Iniciar Escáner
-            if (typeof Html5QrcodeScanner !== 'undefined') {
-                const html5QrcodeScanner = new Html5QrcodeScanner(
-                "reader", { 
-                fps: 50, // Máxima velocidad de cuadros para S24
-                qrbox: {width: 300, height: 150},
-                // Optimización: Limitar formatos acelera drásticamente la detección
-                formatsToSupport: [
-                    Html5QrcodeSupportedFormats.QR_CODE,
-                    Html5QrcodeSupportedFormats.CODE_128,
-                    Html5QrcodeSupportedFormats.CODE_39,
-                    Html5QrcodeSupportedFormats.EAN_13,
-                    Html5QrcodeSupportedFormats.UPC_A
-                ],
-                experimentalFeatures: {
-                    useBarCodeDetectorIfSupported: true
-                },
-                // Usa 'ideal' para preferir la cámara trasera, pero permitir otras si no está disponible
-                videoConstraints: { 
-                    facingMode: "environment", // Forzar cámara trasera por defecto
-                    width: { min: 640, ideal: 1920, max: 3840 }, // Mayor resolución para captar detalles finos
-                    height: { min: 480, ideal: 1080, max: 2160 },
-                    advanced: [{ focusMode: "continuous" }]
-                }
-                }, 
-                false // verbose
-            );
-                
-                // Manejo de errores al iniciar la cámara
-                html5QrcodeScanner.render(onScanSuccess).catch(err => {
-                    console.error(`ERROR AL INICIAR CÁMARA: ${err}`);
-                    document.getElementById('reader-error').innerHTML = `<b>Error de Cámara:</b> No se pudo iniciar. <br>Por favor, otorga los permisos y asegúrate de que no esté en uso.`;
-                    document.getElementById('reader-error').style.display = 'block';
-                });
-            } else {
-                console.error("Librería Html5QrcodeScanner no cargada.");
-            }
+            startScanner();
         });
     </script>
 </body>
