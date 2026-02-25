@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
@@ -56,7 +56,7 @@
         .success { color: #66bb6a; font-weight: 600; margin-right: 8px; }
         .error { color: #ef5350; font-weight: 600; margin-right: 8px; }
         
-        /* Animación de parpadeo para error/duplicado */
+        /* AnimaciÃ³n de parpadeo para error/duplicado */
         .blink-alert { animation: blinkRed 0.5s ease-in-out; }
         @keyframes blinkRed {
             0%, 100% { background-color: #121212; }
@@ -87,6 +87,8 @@
         .btn-close:hover { background-color: #666; }
         .btn-success { background-color: #2e7d32; color: white; }
         .btn-success:hover { background-color: #1b5e20; }
+        .btn-layout { background-color: #1976d2; color: white; margin-bottom: 10px; padding: 15px; font-size: 1.1rem; }
+        .btn-layout:hover { background-color: #1565c0; }
         
         /* Scanner Laser Theme */
         #reader__scan_region { position: relative; overflow: hidden; }
@@ -103,8 +105,8 @@
 <body>
 
     <div class="header-container">
-        <h2>🛡️ Registro de Activos</h2>
-        <span class="settings-icon" id="settings-btn">⚙️</span>
+        <h2>ðŸ›¡ï¸ Registro de Activos</h2>
+        <span class="settings-icon" id="settings-btn">âš™ï¸</span>
     </div>
 
     <div id="reader"></div>
@@ -120,14 +122,14 @@
         <div class="modal-content">
             <h3>Ajustes</h3>
             <div class="setting-item">
-                <span>Sonido de notificación</span>
+                <span>Sonido de notificaciÃ³n</span>
                 <label class="switch">
                     <input type="checkbox" id="sound-toggle">
                     <span class="slider"></span>
                 </label>
             </div>
             <div class="setting-item">
-                <span>Vibración</span>
+                <span>VibraciÃ³n</span>
                 <label class="switch">
                     <input type="checkbox" id="vibration-toggle">
                     <span class="slider"></span>
@@ -140,7 +142,19 @@
         </div>
     </div>
 
-    <!-- Modal de Edición -->
+    <!-- Modal de SelecciÃ³n de Teclado -->
+    <div id="layout-modal" class="modal-overlay">
+        <div class="modal-content">
+            <h3>Seleccione DistribuciÃ³n</h3>
+            <p id="layout-prompt-code" style="color: #aaa; margin-bottom: 15px; word-break: break-all;"></p>
+            <button class="btn btn-layout" onclick="confirmLayout('QWERTY')">QWERTY</button>
+            <button class="btn btn-layout" onclick="confirmLayout('AZERTY')">AZERTY</button>
+            <button class="btn btn-layout" onclick="confirmLayout('QWERTZU')">QWERTZU</button>
+            <button class="btn btn-close" onclick="cancelLayout()">Cancelar</button>
+        </div>
+    </div>
+
+    <!-- Modal de EdiciÃ³n -->
     <div id="edit-modal" class="modal-overlay">
         <div class="modal-content">
             <h3>Editar Registro</h3>
@@ -154,19 +168,24 @@
     </div>
 
     <script>
-        // 1. Sonido de éxito (Beep)
+        // 1. Sonido de Ã©xito (Beep)
         const beep = new Audio("https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3");
         // Sonido de error/duplicado
         const errorBeep = new Audio("https://assets.mixkit.co/active_storage/sfx/2578/2578-preview.mp3");
         
-        // 2. Base de datos temporal en el móvil
+        // 2. Base de datos temporal en el mÃ³vil
         let scannedHistory = [];
         let settings = {};
         let currentEditIndex = -1;
+        let tempScannedCode = "";
+        let isProcessing = false;
+        const GOOGLE_SHEET_URL = "https://docs.google.com/spreadsheets/d/1_VT_QFvuObqWvA-4vngm7u_KBhfIA1AmP-BOjzncJwY/edit?usp=sharing";
+        const GOOGLE_SHEET_WEBAPP_URL = "";
 
         const log = document.getElementById('log-content');
         const settingsModal = document.getElementById('settings-modal');
         const editModal = document.getElementById('edit-modal');
+        const layoutModal = document.getElementById('layout-modal');
         const editInput = document.getElementById('edit-input');
         const soundToggle = document.getElementById('sound-toggle');
         const vibrationToggle = document.getElementById('vibration-toggle');
@@ -175,18 +194,22 @@
         // Renderizado completo del historial
         function renderHistory() {
             log.innerHTML = '';
-            // Iteramos en reverso para mostrar el más reciente arriba
-            scannedHistory.slice().reverse().forEach((code, reversedIndex) => {
-                // Calculamos el índice real en el array original
+            // Iteramos en reverso para mostrar el mÃ¡s reciente arriba
+            scannedHistory.slice().reverse().forEach((item, reversedIndex) => {
+                // Calculamos el Ã­ndice real en el array original
                 const realIndex = scannedHistory.length - 1 - reversedIndex;
                 
-                const item = document.createElement('li');
-                item.className = 'log-item';
-                item.innerHTML = `<span class="success">[✔] REGISTRADO:</span> ${code}`;
+                const li = document.createElement('li');
+                li.className = 'log-item';
+                // Manejo de compatibilidad para items antiguos (strings) vs nuevos (objetos)
+                const displayCode = typeof item === 'string' ? item : item.code;
+                const displayLayout = (typeof item === 'object' && item.layout) ? `<small style="color:#aaa; margin-left:5px;">(${item.layout})</small>` : '';
+                
+                li.innerHTML = `<span class="success">[âœ”] REGISTRADO:</span> ${displayCode} ${displayLayout}`;
                 
                 // Evento para editar/eliminar
-                item.onclick = () => openEditModal(realIndex);
-                log.appendChild(item);
+                li.onclick = () => openEditModal(realIndex);
+                log.appendChild(li);
             });
             updateCount();
         }
@@ -195,11 +218,55 @@
             scanCountElement.textContent = scannedHistory.length;
         }
 
+        function normalizeRecord(item) {
+            if (typeof item === 'string') {
+                return { code: item, layout: 'N/A', date: '' };
+            }
+
+            return {
+                code: item.code || '',
+                layout: item.layout || 'N/A',
+                date: item.date || ''
+            };
+        }
+
+        async function syncHistoryToGoogleSheet() {
+            if (!GOOGLE_SHEET_WEBAPP_URL) return;
+
+            const payload = {
+                spreadsheetUrl: GOOGLE_SHEET_URL,
+                updatedAt: new Date().toISOString(),
+                records: scannedHistory.map(normalizeRecord)
+            };
+
+            const response = await fetch(GOOGLE_SHEET_WEBAPP_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            if (!response.ok) {
+                throw new Error(`No se pudo sincronizar (${response.status})`);
+            }
+        }
+
+        function persistHistory() {
+            persistHistory();
+            syncHistoryToGoogleSheet().catch((error) => {
+                console.error('Error sincronizando Google Sheets:', error);
+            });
+        }
+
         function onScanSuccess(decodedText) {
+            if (isProcessing) return;
+
             const log = document.getElementById('log-content');
             
-            // 3. Verificación de Duplicados
-            if (scannedHistory.includes(decodedText)) {
+            // 3. VerificaciÃ³n de Duplicados
+            // Comprobamos si existe el cÃ³digo en el historial (soportando objetos y strings antiguos)
+            const isDuplicate = scannedHistory.some(item => (typeof item === 'string' ? item : item.code) === decodedText);
+            
+            if (isDuplicate) {
                 // Feedback visual: Parpadeo de pantalla
                 document.body.classList.add('blink-alert');
                 setTimeout(() => document.body.classList.remove('blink-alert'), 500);
@@ -207,33 +274,59 @@
                 // Feedback auditivo: Sonido de error
                 if (settings.sound) { errorBeep.currentTime = 0; errorBeep.play(); }
 
-                // Feedback táctil
+                // Feedback tÃ¡ctil
                 if (settings.vibration && navigator.vibrate) navigator.vibrate([50, 50, 50]);
 
                 // NO mostrar en la lista (return inmediato)
                 return; 
             }
 
-            // 4. Validación de formato (Seguridad)
-            // Filtramos para que solo acepte códigos con formato alfanumérico largo
+            // 4. ValidaciÃ³n de formato (Seguridad)
+            // Filtramos para que solo acepte cÃ³digos con formato alfanumÃ©rico largo
             if(decodedText.length < 5) {
                 // Mostramos error temporalmente en la lista (sin guardar en historial)
                 const item = document.createElement('li');
                 item.className = 'log-item';
-                item.innerHTML = `<span class="error">[X] ERROR:</span> Código muy corto`;
+                item.innerHTML = `<span class="error">[X] ERROR:</span> CÃ³digo muy corto`;
                 log.prepend(item);
                 return;
             }
 
-            // 5. Acción de Éxito
+            // 5. Pausar y preguntar por el teclado
             if (settings.sound) beep.play();
-            scannedHistory.push(decodedText);
-            localStorage.setItem('asset_history', JSON.stringify(scannedHistory));
             
-            renderHistory();
-            
-            // Vibración táctil (exclusivo para móviles como tu S24)
+            // VibraciÃ³n inicial
             if (settings.vibration && navigator.vibrate) navigator.vibrate(100);
+
+            // Abrir modal de selecciÃ³n
+            isProcessing = true;
+            tempScannedCode = decodedText;
+            document.getElementById('layout-prompt-code').textContent = `CÃ³digo: ${decodedText}`;
+            layoutModal.style.display = 'flex';
+        }
+
+        function confirmLayout(layout) {
+            const newRecord = {
+                code: tempScannedCode,
+                layout: layout,
+                date: new Date().toLocaleString()
+            };
+            
+            scannedHistory.push(newRecord);
+            persistHistory();
+            renderHistory();
+            closeLayoutModal();
+        }
+
+        function cancelLayout() {
+            closeLayoutModal();
+        }
+
+        function closeLayoutModal() {
+            layoutModal.style.display = 'none';
+            tempScannedCode = "";
+            // PequeÃ±o delay para evitar re-escaneo inmediato de lo mismo si la cÃ¡mara sigue apuntando
+            setTimeout(() => { isProcessing = false; }, 1000);
         }
 
         function loadSettings() {
@@ -258,18 +351,19 @@
         }
 
         function clearHistory() {
-            if (confirm('¿Estás seguro de que quieres borrar todo el historial? Esta acción no se puede deshacer.')) {
+            if (confirm('Â¿EstÃ¡s seguro de que quieres borrar todo el historial? Esta acciÃ³n no se puede deshacer.')) {
                 scannedHistory = [];
-                localStorage.removeItem('asset_history');
+                persistHistory();
                 renderHistory();
                 settingsModal.style.display = 'none';
             }
         }
 
-        // --- Funciones de Edición ---
+        // --- Funciones de EdiciÃ³n ---
         function openEditModal(index) {
             currentEditIndex = index;
-            editInput.value = scannedHistory[index];
+            const item = scannedHistory[index];
+            editInput.value = typeof item === 'string' ? item : item.code;
             editModal.style.display = 'flex';
         }
 
@@ -277,8 +371,14 @@
             if (currentEditIndex > -1) {
                 const newValue = editInput.value.trim();
                 if (newValue) {
-                    scannedHistory[currentEditIndex] = newValue;
-                    localStorage.setItem('asset_history', JSON.stringify(scannedHistory));
+                    // Mantener el layout y fecha si es un objeto, o convertir a objeto si era string
+                    const oldItem = scannedHistory[currentEditIndex];
+                    if (typeof oldItem === 'object') {
+                        scannedHistory[currentEditIndex].code = newValue;
+                    } else {
+                        scannedHistory[currentEditIndex] = newValue; // Mantener compatibilidad simple o actualizar a objeto
+                    }
+                    persistHistory();
                     renderHistory();
                     editModal.style.display = 'none';
                 }
@@ -286,9 +386,9 @@
         }
 
         function deleteItem() {
-            if (currentEditIndex > -1 && confirm('¿Eliminar este registro?')) {
+            if (currentEditIndex > -1 && confirm('Â¿Eliminar este registro?')) {
                 scannedHistory.splice(currentEditIndex, 1);
-                localStorage.setItem('asset_history', JSON.stringify(scannedHistory));
+                persistHistory();
                 renderHistory();
                 editModal.style.display = 'none';
             }
@@ -299,7 +399,15 @@
                 alert("No hay datos para exportar.");
                 return;
             }
-            const csvContent = "Codigo\n" + scannedHistory.join("\n");
+            
+            let csvContent = "Codigo,Layout,Fecha\n";
+            scannedHistory.forEach(item => {
+                const code = typeof item === 'string' ? item : item.code;
+                const layout = (typeof item === 'object' && item.layout) ? item.layout : 'N/A';
+                const date = (typeof item === 'object' && item.date) ? item.date : '';
+                csvContent += `${code},${layout},${date}\n`;
+            });
+            
             const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
             const url = URL.createObjectURL(blob);
             const link = document.createElement("a");
@@ -318,9 +426,9 @@
 
             const html5QrcodeScanner = new Html5QrcodeScanner(
                 "reader", { 
-                fps: 30, // Más rápido
+                fps: 30, // MÃ¡s rÃ¡pido
                 qrbox: {width: 300, height: 200},
-                // Usa 'ideal' para preferir la cámara trasera, pero permitir otras si no está disponible
+                // Usa 'ideal' para preferir la cÃ¡mara trasera, pero permitir otras si no estÃ¡ disponible
                 videoConstraints: { 
                     facingMode: { ideal: "environment" }
                 }
@@ -328,10 +436,10 @@
                 false // verbose
             );
             
-            // Manejo de errores al iniciar la cámara
+            // Manejo de errores al iniciar la cÃ¡mara
             html5QrcodeScanner.render(onScanSuccess).catch(err => {
-                console.error(`ERROR AL INICIAR CÁMARA: ${err}`);
-                document.getElementById('reader-error').innerHTML = `<b>Error de Cámara:</b> No se pudo iniciar. <br>Por favor, otorga los permisos y asegúrate de que no esté en uso.`;
+                console.error(`ERROR AL INICIAR CÃMARA: ${err}`);
+                document.getElementById('reader-error').innerHTML = `<b>Error de CÃ¡mara:</b> No se pudo iniciar. <br>Por favor, otorga los permisos y asegÃºrate de que no estÃ© en uso.`;
                 document.getElementById('reader-error').style.display = 'block';
             });
 
@@ -345,7 +453,7 @@
             document.getElementById('clear-history-btn').addEventListener('click', clearHistory);
             document.getElementById('export-csv-btn').addEventListener('click', exportToCSV);
             
-            // Listeners para edición
+            // Listeners para ediciÃ³n
             document.getElementById('close-edit-btn').addEventListener('click', () => editModal.style.display = 'none');
             document.getElementById('save-edit-btn').addEventListener('click', saveEdit);
             document.getElementById('delete-item-btn').addEventListener('click', deleteItem);
@@ -362,3 +470,4 @@
     </script>
 </body>
 </html>
+
