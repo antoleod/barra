@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>S24 Asset Security Scan</title>
+    <script src="https://unpkg.com/html5-qrcode"></script>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #1a1a1a; color: white; text-align: center; padding: 20px; }
+        #reader { width: 100%; max-width: 500px; border-radius: 20px; border: 2px solid #333; margin: auto; overflow: hidden; background: #000; }
+        .log-container { margin-top: 20px; background: #2d2d2d; padding: 15px; border-radius: 12px; text-align: left; max-height: 200px; overflow-y: auto; }
+        .success { color: #4caf50; font-weight: bold; }
+        .error { color: #f44336; font-weight: bold; }
+        .duplicate { color: #ff9800; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+    <h2>🛡️ Registro de Activos Seguro</h2>
+    <div id="reader"></div>
+    
+    <div class="log-container" id="history">
+        <strong>Historial de Sesión:</strong><br>
+        <div id="log-content"></div>
+    </div>
+
+    <script>
+        // 1. Sonido de éxito (Beep)
+        const beep = new Audio("https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3");
+        
+        // 2. Base de datos temporal en el móvil
+        let scannedHistory = JSON.parse(localStorage.getItem('asset_history')) || [];
+
+        function onScanSuccess(decodedText) {
+            const log = document.getElementById('log-content');
+            
+            // 3. Verificación de Duplicados
+            if (scannedHistory.includes(decodedText)) {
+                log.innerHTML = `<span class="duplicate">[!] REPETIDO: ${decodedText}</span><br>` + log.innerHTML;
+                return; // Bloquea el proceso
+            }
+
+            // 4. Validación de formato (Seguridad)
+            // Filtramos para que solo acepte códigos con formato alfanumérico largo
+            if(decodedText.length < 5) {
+                log.innerHTML = `<span class="error">[X] INVÁLIDO: Código muy corto</span><br>` + log.innerHTML;
+                return;
+            }
+
+            // 5. Acción de Éxito
+            beep.play();
+            scannedHistory.push(decodedText);
+            localStorage.setItem('asset_history', JSON.stringify(scannedHistory));
+            
+            log.innerHTML = `<span class="success">[✔] REGISTRADO: ${decodedText}</span><br>` + log.innerHTML;
+            
+            // Vibración táctil (exclusivo para móviles como tu S24)
+            if (navigator.vibrate) navigator.vibrate(100);
+        }
+
+        let html5QrcodeScanner = new Html5QrcodeScanner(
+            "reader", { fps: 20, qrbox: {width: 280, height: 180} }
+        );
+        html5QrcodeScanner.render(onScanSuccess);
+    </script>
+</body>
+</html>
