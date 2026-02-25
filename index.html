@@ -164,6 +164,7 @@
             <hr style="border-color: #444; margin: 25px 0;">
             <button id="open-sheet-btn" class="btn btn-layout" style="margin-bottom: 0; padding: 10px 15px; font-size: 1rem;">Abrir Hoja de Google</button>
             <button id="export-csv-btn" class="btn btn-success">Exportar CSV</button>
+            <button id="export-json-btn" class="btn btn-layout" style="background-color: #f57c00; color: white;">Exportar JSON</button>
             <button id="clear-history-btn" class="btn btn-danger">Borrar Historial</button>
             <button id="close-modal-btn" class="btn btn-close">Cerrar</button>
         </div>
@@ -308,8 +309,22 @@
             syncHistoryToGoogleSheet().catch((error) => console.error('Error sincronizando Google Sheets:', error));
         }
 
+        function transformCode(code) {
+            // Regla: 02PI + 20xx + resto + 2digitos -> MUSTBRUN + xx + resto
+            // Ejemplo: 02PI20230850811 -> MUSTBRUN2308508
+            // Explicación: Reemplaza '02PI' con 'MUSTBRUN', '2023' con '23', y elimina los últimos 2 dígitos '11'.
+            const regex = /^02PI20(\d{2})(.+)\d{2}$/;
+            if (regex.test(code)) {
+                return code.replace(regex, "MUSTBRUN$1$2");
+            }
+            return code;
+        }
+
         function onScanSuccess(decodedText) {
             if (isProcessing) return;
+
+            // Aplicar transformación de código (Regla de negocio)
+            decodedText = transformCode(decodedText);
 
             const log = document.getElementById('log-content');
             
@@ -490,6 +505,22 @@
             document.body.removeChild(link);
         }
 
+        function exportToJSON() {
+            if (scannedHistory.length === 0) {
+                alert("No hay datos para exportar.");
+                return;
+            }
+            const jsonContent = JSON.stringify(scannedHistory, null, 2);
+            const blob = new Blob([jsonContent], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            link.setAttribute("href", url);
+            link.setAttribute("download", `activos_scan_${new Date().toISOString().slice(0,10)}.json`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
         // --- Event Listeners ---
         document.addEventListener('DOMContentLoaded', () => {
             // 1. Cargar datos (con protección contra errores)
@@ -510,6 +541,7 @@
             if(trashBtn) trashBtn.addEventListener('click', clearHistory);
 
             document.getElementById('export-csv-btn').addEventListener('click', exportToCSV);
+            document.getElementById('export-json-btn').addEventListener('click', exportToJSON);
             document.getElementById('open-sheet-btn').addEventListener('click', () => {
                 window.open(GOOGLE_SHEET_VIEW_URL, '_blank');
             });
@@ -561,7 +593,7 @@
                 },
                 // Usa 'ideal' para preferir la cámara trasera, pero permitir otras si no está disponible
                 videoConstraints: { 
-                    facingMode: { ideal: "environment" },
+                    facingMode: "environment", // Forzar cámara trasera por defecto
                     width: { min: 640, ideal: 1920, max: 3840 }, // Mayor resolución para captar detalles finos
                     height: { min: 480, ideal: 1080, max: 2160 },
                     advanced: [{ focusMode: "continuous" }]
