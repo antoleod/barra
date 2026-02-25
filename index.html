@@ -421,6 +421,7 @@
             tempScan: null,
             filter: 'all',
             scanner: null,
+            laserSound: new Audio("https://assets.mixkit.co/active_storage/sfx/600/600-preview.mp3"),
 
             async init() {
                 await db.init();
@@ -550,7 +551,11 @@
                 this.tempScan = finalCode;
                 document.getElementById('layout-prompt-code').innerText = finalCode;
                 document.getElementById('layout-modal').style.display = 'flex';
-                if(navigator.vibrate) navigator.vibrate(100);
+                
+                // Feedback: Vibration + Laser Sound
+                if(navigator.vibrate) navigator.vibrate(200);
+                this.laserSound.currentTime = 0;
+                this.laserSound.play().catch(e => console.warn("Audio play failed", e));
             },
 
             async confirmScan(layout) {
