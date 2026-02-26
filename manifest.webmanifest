@@ -1,0 +1,19 @@
+﻿{
+  "name": "Barra Scanner",
+  "short_name": "Barra",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#0b0d10",
+  "theme_color": "#0b0d10",
+  "orientation": "portrait-primary",
+  "lang": "es",
+  "description": "Escaneo de codigos de barras con sincronizacion a Google Sheets",
+  "icons": [
+    {
+      "src": "./icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
