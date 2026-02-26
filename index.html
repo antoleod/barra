@@ -474,7 +474,7 @@
 
             bindEvents() {
                 document.getElementById('settings-btn').onclick = () => document.getElementById('settings-modal').style.display = 'flex';
-                document.getElementById('sync-btn').onclick = () => this.openSyncModal();
+                document.getElementById('sync-btn').onclick = () => this.runFullSync();
                 document.getElementById('search-input').oninput = (e) => this.renderList(e.target.value);
                 
                 // Settings inputs save on blur
@@ -651,6 +651,99 @@
             },
 
             // --- SYNC LOGIC ---
+            async runFullSync() {
+                const syncBtn = document.getElementById('sync-btn');
+                if (syncBtn.disabled) return; // Prevent multiple clicks
+
+                const originalIcon = syncBtn.innerText;
+                syncBtn.innerText = '🔄';
+                syncBtn.disabled = true;
+                
+                const feedback = document.getElementById('scan-feedback');
+                const showFeedback = (msg, color) => {
+                    feedback.innerText = msg;
+                    feedback.style.color = `var(--${color}-color)`;
+                };
+
+                showFeedback('Syncing...', 'text-secondary');
+
+                try {
+                    // Step 1: Push local changes to the server
+                    const pending = this.scans.filter(s => s.status === 'pending');
+                    if (pending.length > 0) {
+                        showFeedback(`Pushing ${pending.length} items...`, 'text-secondary');
+                        const pushResult = await this.pushToServer(pending, true); // silent mode
+                        if (!pushResult.success) {
+                            throw new Error(`Push failed: ${pushResult.message}`);
+                        }
+                    }
+
+                    // Step 2: Pull all data from the server
+                    showFeedback('Fetching from cloud...', 'text-secondary');
+                    const serverScans = await this.pullFromServer();
+                    if (serverScans === null) { // pullFromServer returns null on failure
+                        throw new Error("Pull from server failed. Check console.");
+                    }
+
+                    // Step 3: Merge server data into local DB
+                    showFeedback('Merging data...', 'text-secondary');
+                    const newItems = await this.mergeScans(serverScans);
+                    
+                    showFeedback(`Sync complete. ${newItems} new items added.`, 'success');
+
+                } catch (e) {
+                    console.error('Full sync failed:', e);
+                    showFeedback(`Sync Failed: ${e.message}`, 'danger');
+                } finally {
+                    syncBtn.innerText = originalIcon;
+                    syncBtn.disabled = false;
+                    setTimeout(() => {
+                        if (feedback.innerText.startsWith('Sync')) {
+                            feedback.innerText = '';
+                        }
+                    }, 5000);
+                }
+            },
+
+            async pullFromServer() {
+                const url = logic.settings.scriptUrl;
+                if (!url) {
+                    alert('Please configure Google Apps Script URL in Settings.');
+                    return null;
+                }
+
+                try {
+                    // NOTE: Your Google Apps Script must be deployed to handle GET requests
+                    // and return JSON with correct CORS headers.
+                    const response = await fetch(url, { mode: 'cors' }); 
+                    if (!response.ok) {
+                        throw new Error(`Server responded with status: ${response.status}`);
+                    }
+                    const data = await response.json();
+                    // Expecting format: { records: [...] }
+                    return data.records || [];
+                } catch (e) {
+                    console.error('Failed to pull data from server:', e);
+                    alert(`Failed to fetch data from the cloud. Make sure the Apps Script is configured for GET requests and CORS.\nError: ${e.message}`);
+                    return null; // Indicate failure
+                }
+            },
+
+            async mergeScans(serverScans) {
+                const localCodes = new Set(this.scans.map(s => s.code_normalized));
+                let newScansAdded = 0;
+
+                for (const serverScan of serverScans) {
+                    if (serverScan.code_normalized && !localCodes.has(serverScan.code_normalized)) {
+                        const newRecord = { code_original: serverScan.code_original || serverScan.code_normalized, code_normalized: serverScan.code_normalized, pi_mode: serverScan.pi_mode || 'UNKNOWN', layout: serverScan.layout || 'UNKNOWN', date: serverScan.date || new Date().toISOString(), used: serverScan.used || false, dateUsed: serverScan.dateUsed || null, status: 'sent' };
+                        await db.addScan(newRecord);
+                        newScansAdded++;
+                    }
+                }
+                if (newScansAdded > 0) { await this.loadScans(); }
+                return newScansAdded;
+            },
+
             openSyncModal() {
                 const pending = this.scans.filter(s => s.status === 'pending');
                 const container = document.getElementById('sync-list');
@@ -712,39 +805,44 @@
                 window.open(url, '_blank');
             },
 
-            async syncToScript() {
+            async syncToScript() { // This is called from the modal
                 const pending = this.scans.filter(s => s.status === 'pending');
                 if (pending.length === 0) { alert('No pending items to sync.'); return; }
-
-                const url = logic.settings.scriptUrl;
-                if (!url) { alert('Please configure Google Apps Script URL in Settings.'); return; }
 
                 const btn = document.querySelector('#sync-modal .btn-primary');
                 const originalText = btn.innerText;
                 btn.innerText = 'Sending...';
                 btn.disabled = true;
 
-                try {
-                    // Send data using no-cors (opaque response)
-                    await fetch(url, {
-                        method: 'POST',
-                        mode: 'no-cors',
-                        headers: { 'Content-Type': 'text/plain' }, // text/plain avoids preflight
-                        body: JSON.stringify({ records: pending })
-                    });
+                const result = await this.pushToServer(pending);
 
-                    // Assume success if no network error
-                    for (const item of pending) {
-                        await db.updateStatus(item.id, 'sent');
-                    }
-                    this.loadScans();
+                if (result.success && result.count > 0) {
                     this.openSyncModal(); // Refresh list
-                    alert('Sync initiated! Check your Google Sheet.');
+                    alert(`Successfully synced ${result.count} items!`);
+                }
+                
+                btn.innerText = originalText;
+                btn.disabled = false;
+            },
+
+            async pushToServer(itemsToPush, silent = false) {
+                if (!itemsToPush || itemsToPush.length === 0) return { success: true, message: "No items to push." };
+                const url = logic.settings.scriptUrl;
+                if (!url) {
+                    if (!silent) alert('Please configure Google Apps Script URL in Settings.');
+                    return { success: false, message: 'Script URL not configured.' };
+                }
+                try {
+                    // IMPORTANT: This now uses 'cors' mode. Your Google Apps Script must be configured for CORS.
+                    const response = await fetch(url, { method: 'POST', mode: 'cors', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ records: itemsToPush }) });
+                    if (!response.ok) throw new Error(`Server returned status ${response.status}`);
+                    for (const item of itemsToPush) { await db.updateStatus(item.id, 'sent'); }
+                    await this.loadScans();
+                    return { success: true, count: itemsToPush.length };
                 } catch (e) {
-                    alert('Sync failed: ' + e.message);
-                } finally {
-                    btn.innerText = originalText;
-                    btn.disabled = false;
+                    console.error('Push to server failed:', e);
+                    if (!silent) alert('Push to server failed: ' + e.message);
+                    return { success: false, message: e.message };
                 }
             },
 
