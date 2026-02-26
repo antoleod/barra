@@ -227,7 +227,11 @@
 
     <!-- SCANNER -->
     <div id="reader"></div>
-    <div id="scan-feedback" style="margin-top:10px; min-height:20px; text-align:center; font-weight:600;"></div>
+    <div style="text-align: center; margin-top: 10px; margin-bottom: 10px;">
+        <button id="scan-file-btn" class="btn-secondary" style="padding: 8px 16px; font-size: 0.9rem; width: auto; margin-top:0;">📷 Scan from Image</button>
+        <input type="file" id="scan-file-input" accept="image/*" style="display: none;">
+    </div>
+    <div id="scan-feedback" style="min-height:20px; text-align:center; font-weight:600;"></div>
     
     <!-- LIST -->
     <div class="log-container" id="history">
@@ -478,6 +482,9 @@
                 document.getElementById('settings-btn').onclick = () => document.getElementById('settings-modal').style.display = 'flex';
                 document.getElementById('sync-btn').onclick = () => this.runFullSync();
                 document.getElementById('search-input').oninput = (e) => this.renderList(e.target.value);
+
+                document.getElementById('scan-file-btn').onclick = () => document.getElementById('scan-file-input').click();
+                document.getElementById('scan-file-input').onchange = (e) => this.scanImageFile(e);
                 
                 // Settings inputs save on blur
                 document.querySelectorAll('.setting-input').forEach(el => el.onblur = () => logic.saveSettings());
@@ -715,7 +722,7 @@
 
                     // Step 2: Pull all data from the server
                     if (!silent) showFeedback('Fetching from cloud...', 'text-secondary');
-                    const serverScans = await this.pullFromServer();
+                    const serverScans = await this.pullFromServer(silent);
                     if (serverScans === null) { // pullFromServer returns null on failure
                         throw new Error("Pull from server failed. Check console.");
                     }
@@ -747,10 +754,10 @@
                 }
             },
 
-            async pullFromServer() {
+            async pullFromServer(silent = false) {
                 const url = logic.settings.scriptUrl;
                 if (!url) {
-                    alert('Please configure Google Apps Script URL in Settings.');
+                    if (!silent) alert('Please configure Google Apps Script URL in Settings.');
                     return null;
                 }
 
@@ -766,8 +773,38 @@
                     return data.records || [];
                 } catch (e) {
                     console.error('Failed to pull data from server:', e);
-                    alert(`Failed to fetch data from the cloud. Make sure the Apps Script is configured for GET requests and CORS.\nError: ${e.message}`);
+                    if (!silent) {
+                        alert(`Failed to fetch data from the cloud. Make sure the Apps Script is configured for GET requests and CORS.\nError: ${e.message}`);
+                    }
                     return null; // Indicate failure
+                }
+            },
+
+            async scanImageFile(event) {
+                const feedback = document.getElementById('scan-feedback');
+                if (!event.target.files || event.target.files.length === 0) {
+                    return;
+                }
+                const imageFile = event.target.files[0];
+
+                feedback.innerText = 'Scanning image...';
+                feedback.style.color = 'var(--text-secondary)';
+
+                try {
+                    // Temporarily stop the video scanner to avoid conflicts
+                    if (this.scanner) {
+                        await this.scanner.clear().catch(err => console.error("Scanner clear failed", err));
+                    }
+                    const html5QrCode = new Html5Qrcode("reader");
+                    const decodedText = await html5QrCode.scanFile(imageFile, true); // showImage = true
+                    this.onScan(decodedText);
+                } catch (err) {
+                    console.error('File scan error:', err);
+                    feedback.innerText = 'No barcode found in image.';
+                    feedback.style.color = 'var(--danger-color)';
+                } finally {
+                    this.startScanner(); // Restart video scanner
+                    event.target.value = ''; // Clear input to allow re-scanning same file
                 }
             },
 
@@ -925,10 +962,7 @@
                         Html5QrcodeSupportedFormats.CODE_39,
                         Html5QrcodeSupportedFormats.EAN_13,
                         Html5QrcodeSupportedFormats.UPC_A
-                    ],
-                    videoConstraints: {
-                        facingMode: "environment"
-                    }
+                    ]
                 }, false);
                 
                 this.scanner.render(
