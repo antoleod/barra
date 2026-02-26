@@ -1,4 +1,4 @@
-﻿const CACHE = "barra-scanner-v3";
+﻿const CACHE = "barra-scanner-v4";
 const CORE = ["./", "./index.html", "./styles.css", "./manifest.webmanifest", "./icon.svg"];
 
 self.addEventListener("install", (event) => {
@@ -29,4 +29,5 @@ self.addEventListener("fetch", (event) => {
     )
   );
 });
+
 
