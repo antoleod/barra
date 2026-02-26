@@ -4,302 +4,360 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Barra Scanner Pro</title>
-    <meta name="theme-color" content="#000000">
+    <meta name="theme-color" content="#121212">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <script src="https://unpkg.com/html5-qrcode"></script>
     <style>
-        /* --- CORE STYLES --- */
+        /* --- MODERN APP-LIKE STYLES --- */
         :root {
-            --bg-color: #000000;
-            --card-bg: #1c1c1e;
+            --bg-color: #121212;
+            --surface-color: #1e1e1e;
+            --surface-light: #2a2a2a;
             --text-primary: #ffffff;
-            --text-secondary: #8e8e93;
+            --text-secondary: #b3b3b3;
             --accent-color: #0A84FF;
             --success-color: #30d158;
             --warning-color: #ff9f0a;
             --danger-color: #ff453a;
-            --border-color: #38383a;
-            --font-stack: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            --border-color: #333333;
+            --font-stack: -apple-system, BlinkMacSystemFont, "Roboto", "Segoe UI", "Oxygen", "Ubuntu", "Cantarell", "Fira Sans", "Droid Sans", "Helvetica Neue", sans-serif;
+            --bottom-nav-height: 65px;
+            --panel-header-height: 60px;
         }
 
         body { 
             font-family: var(--font-stack);
             background: var(--bg-color); 
             color: var(--text-primary); 
-            display: flex; 
-            flex-direction: column; 
-            align-items: center; 
-            min-height: 100vh;
             margin: 0;
-            padding: 16px;
-            box-sizing: border-box;
             -webkit-font-smoothing: antialiased;
-        }
-
-        /* --- HEADER & CONTROLS --- */
-        .header-container {
-            width: 100%;
-            max-width: 600px;
+            height: 100vh;
+            width: 100vw;
+            overflow: hidden;
             display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 16px;
-        }
-        h1 { margin: 0; font-size: 1.5rem; font-weight: 700; letter-spacing: -0.5px; }
-        
-        .mode-selector {
-            display: flex;
-            background: var(--card-bg);
-            border-radius: 9px;
-            padding: 2px;
-            margin-bottom: 16px;
-            width: 100%;
-            max-width: 600px;
-        }
-        .mode-btn {
-            flex: 1;
-            border: none;
-            background: transparent;
-            color: var(--text-secondary);
-            padding: 8px;
-            font-size: 0.9rem;
-            font-weight: 600;
-            border-radius: 7px;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-        .mode-btn.active {
-            background: var(--accent-color);
-            color: white;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+            flex-direction: column;
         }
 
         /* --- SCANNER AREA --- */
-        #reader { 
-            width: 100%; 
-            max-width: 600px; 
-            border-radius: 18px; 
-            overflow: hidden; 
-            background: #000; 
-            position: relative;
-            min-height: 250px;
+        #scanner-view {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: #000;
+            z-index: 1;
         }
-        
-        /* --- LIST & LOGS --- */
-        .log-container { 
-            width: 100%; 
-            max-width: 600px; 
-            margin-top: 20px; 
-            background: var(--card-bg); 
-            border-radius: 18px; 
+        #reader { 
+            width: 100%; height: 100%;
+            object-fit: cover;
+        }
+        #reader video {
+            transform: scale(1); /* Fix for some Android browsers */
+        }
+
+        #viewfinder {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            border: 50vmax solid rgba(0,0,0,0.5);
+            box-shadow: inset 0 0 0 3px white;
+            width: 280px; height: 150px;
+            margin: auto;
+            transition: box-shadow 0.2s ease-in-out;
+        }
+        #viewfinder.success { box-shadow: inset 0 0 0 5px var(--success-color); }
+        #viewfinder.warning { box-shadow: inset 0 0 0 5px var(--warning-color); }
+
+        /* --- UI OVERLAYS & CONTROLS --- */
+        .top-controls {
+            position: fixed;
+            top: 0; left: 0; right: 0;
+            padding: 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 10;
+            background: linear-gradient(to bottom, rgba(0,0,0,0.6), transparent);
+        }
+        .icon-btn {
+            background: rgba(0,0,0,0.4);
+            border: 1px solid rgba(255,255,255,0.2);
+            color: white;
+            width: 44px; height: 44px;
+            border-radius: 50%;
+            font-size: 1.2rem;
+            display: inline-flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            backdrop-filter: blur(5px);
+        }
+        #offline-badge {
+            background: var(--danger-color);
+            color: white;
+            padding: 4px 8px;
+            border-radius: 16px;
+            font-size: 0.7rem;
+            font-weight: 600;
+        }
+
+        /* --- BOTTOM NAVIGATION --- */
+        #bottom-nav {
+            position: fixed;
+            bottom: 0; left: 0; right: 0;
+            height: var(--bottom-nav-height);
+            background: var(--surface-color);
+            border-top: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            z-index: 100;
+        }
+        .nav-btn {
+            background: none; border: none; color: var(--text-secondary);
+            display: flex; flex-direction: column; align-items: center;
+            font-size: 0.7rem; gap: 4px; padding: 8px;
+            cursor: pointer;
+        }
+        .nav-btn .icon { font-size: 1.5rem; }
+        .nav-btn.active { color: var(--accent-color); }
+
+        /* --- SLIDE-UP PANELS (HISTORY, SETTINGS) --- */
+        .panel {
+            position: fixed;
+            left: 0; right: 0; bottom: 0;
+            height: calc(100% - 80px); /* Leave space at top */
+            background: var(--surface-color);
+            border-top-left-radius: 20px;
+            border-top-right-radius: 20px;
+            z-index: 200;
             display: flex;
             flex-direction: column;
-            flex: 1;
-            overflow: hidden;
+            transform: translateY(100%);
+            transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+            box-shadow: 0 -10px 30px rgba(0,0,0,0.3);
         }
-        .log-header { 
-            padding: 12px 16px; 
-            background: rgba(28, 28, 30, 0.95); 
-            border-bottom: 1px solid var(--border-color); 
-            backdrop-filter: blur(10px);
-            z-index: 10;
+        .panel.visible {
+            transform: translateY(0);
         }
-        .tabs { display: flex; gap: 10px; margin-bottom: 10px; }
-        .tab { 
-            font-size: 0.85rem; color: var(--text-secondary); cursor: pointer; padding-bottom: 4px; border-bottom: 2px solid transparent; 
+        .panel-header {
+            flex-shrink: 0;
+            padding: 0 20px;
+            height: var(--panel-header-height);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--border-color);
+            position: relative;
+        }
+        .panel-header::before { /* Grabber handle */
+            content: '';
+            position: absolute;
+            top: 8px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 40px;
+            height: 5px;
+            background: var(--border-color);
+            border-radius: 3px;
+        }
+        .panel-header h2 { margin: 0; font-size: 1.2rem; }
+        .panel-content {
+            flex-grow: 1;
+            overflow-y: auto;
+            padding: 0 20px 20px 20px;
+        }
+
+        /* --- HISTORY PANEL SPECIFICS --- */
+        #history-controls { padding: 16px 0; }
+        #search-input {
+            width: 100%; padding: 12px 16px; border-radius: 12px; border: none;
+            background: var(--surface-light); color: white; box-sizing: border-box; font-size: 1rem;
+        }
+        .tabs { display: flex; gap: 16px; margin-top: 16px; }
+        .tab {
+            font-size: 0.9rem; color: var(--text-secondary); cursor: pointer; padding-bottom: 8px;
+            border-bottom: 2px solid transparent; font-weight: 500;
         }
         .tab.active { color: var(--text-primary); border-color: var(--accent-color); font-weight: 600; }
 
-        #log-content { 
-            padding: 0; list-style: none; margin: 0; 
-            overflow-y: auto; max-height: 40vh;
+        #log-content { padding: 0; list-style: none; margin: 0; }
+        .log-item {
+            background: var(--surface-light);
+            padding: 16px;
+            border-radius: 12px;
+            margin-bottom: 12px;
+            display: grid;
+            grid-template-columns: 1fr auto;
+            gap: 12px;
         }
-        .log-item { 
-            padding: 16px; 
-            border-bottom: 1px solid var(--border-color); 
-            display: flex; 
-            justify-content: space-between;
-            align-items: center;
-            font-size: 0.95rem; 
-        }
-        .log-item:last-child { border-bottom: none; }
-        
-        .item-info { display: flex; flex-direction: column; gap: 4px; }
-        .item-code { font-family: monospace; font-size: 1.1em; font-weight: 600; }
-        .item-meta { font-size: 0.75rem; color: var(--text-secondary); display: flex; gap: 8px; align-items: center; }
-        
-        .badge { padding: 2px 6px; border-radius: 4px; font-size: 0.7rem; font-weight: 700; text-transform: uppercase; }
+        .item-info { display: flex; flex-direction: column; gap: 8px; }
+        .item-code { font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace; font-size: 1.1rem; font-weight: 600; word-break: break-all; }
+        .item-meta { font-size: 0.8rem; color: var(--text-secondary); display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+        .badge { padding: 3px 8px; border-radius: 16px; font-size: 0.7rem; font-weight: 600; text-transform: uppercase; }
         .badge-full { background: rgba(10, 132, 255, 0.2); color: #64d2ff; }
         .badge-short { background: rgba(255, 159, 10, 0.2); color: #ffd60a; }
-        .badge-pending { background: #3a3a3c; color: #aaa; }
+        .badge-pending { background: #444; color: #ccc; }
         .badge-sent { background: rgba(48, 209, 88, 0.2); color: #30d158; }
         .badge-used { background: rgba(255, 69, 58, 0.2); color: #ff453a; }
 
-        /* --- UTILS --- */
-        #search-input { 
-            width:100%; padding:10px 12px; border-radius:10px; border:none; 
-            background:#2c2c2e; color:white; box-sizing:border-box; font-size: 1rem; 
+        .item-actions .btn-secondary {
+            padding: 6px 12px; font-size: 0.8rem; margin-top: 0;
         }
-        
-        .blink-error { animation: blinkRed 0.4s ease-in-out; }
-        @keyframes blinkRed { 0%, 100% { background: #000; } 50% { background: #4a1010; } }
 
-        .icon-btn { font-size: 1.2rem; cursor: pointer; padding: 8px; border-radius: 50%; background: #2c2c2e; border: none; color: white; }
-        .icon-btn:active { transform: scale(0.95); }
+        /* --- SETTINGS PANEL & GENERAL FORM STYLES --- */
+        .setting-group { margin-bottom: 24px; }
+        .setting-label { display: block; font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 500; }
+        .setting-input { width: 100%; background: var(--surface-light); border: 1px solid var(--border-color); color: white; padding: 12px; border-radius: 10px; box-sizing: border-box; font-size: 1rem; }
+        .help-text { font-size: 0.85rem; color: var(--text-secondary); margin-top: 8px; line-height: 1.5; }
+        .help-text code { background: #444; padding: 2px 5px; border-radius: 4px; }
 
-        /* --- MODALS --- */
-        .modal-overlay { 
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
-            background: rgba(0,0,0,0.6); backdrop-filter: blur(5px); 
-            display: none; justify-content: center; align-items: center; z-index: 1000; 
-        }
-        .modal-content { 
-            background: #1c1c1e; padding: 24px; border-radius: 20px; 
-            width: 90%; max-width: 400px; max-height: 85vh; overflow-y: auto; 
-            box-shadow: 0 20px 40px rgba(0,0,0,0.6); border: 1px solid var(--border-color);
-        }
-        .modal-content h3 { margin-top: 0; border-bottom: 1px solid #444; padding-bottom: 10px; }
-        
-        .setting-group { margin-bottom: 20px; }
-        .setting-label { display: block; font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px; }
-        .setting-input { width: 100%; background: #2c2c2e; border: 1px solid #444; color: white; padding: 10px; border-radius: 8px; box-sizing: border-box; }
-        
+        .switch-group { display: flex; justify-content: space-between; align-items: center; }
         .switch { position: relative; display: inline-block; width: 50px; height: 28px; }
         .switch input { opacity: 0; width: 0; height: 0; }
-        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #3a3a3c; transition: .4s; border-radius: 28px; }
-        .slider:before { position: absolute; content: ""; height: 20px; width: 20px; left: 4px; bottom: 4px; background-color: white; transition: .4s; border-radius: 50%; }
+        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: var(--surface-light); transition: .4s; border-radius: 28px; }
+        .slider:before { position: absolute; content: ""; height: 22px; width: 22px; left: 3px; bottom: 3px; background-color: white; transition: .4s; border-radius: 50%; }
         input:checked + .slider { background-color: var(--success-color); }
-        input:checked + .slider:before { transform: translateX(22px); } 
+        input:checked + .slider:before { transform: translateX(22px); }
 
-        .btn { width: 100%; padding: 14px; border-radius: 12px; border: none; font-weight: 600; font-size: 1rem; margin-top: 10px; cursor: pointer; }
+        .btn { width: 100%; padding: 16px; border-radius: 12px; border: none; font-weight: 600; font-size: 1rem; margin-top: 12px; cursor: pointer; }
         .btn-primary { background: var(--accent-color); color: white; }
-        .btn-secondary { background: #3a3a3c; color: white; }
-        .btn-danger { background: rgba(255, 69, 58, 0.15); color: var(--danger-color); }
-        
-        /* --- BATCH CONTROLS --- */
-        .batch-controls {
-            display: flex; justify-content: space-between; align-items: center;
-            background: var(--card-bg); padding: 12px 16px; border-radius: 12px;
-            margin-bottom: 16px; width: 100%; max-width: 600px; box-sizing: border-box;
-        }
-        .batch-select {
-            background: #2c2c2e; color: white; border: 1px solid #444;
-            padding: 6px 12px; border-radius: 8px; font-size: 0.9rem;
-        }
-        .batch-select:disabled { opacity: 0.5; }
-        .batch-label { font-weight: 600; font-size: 0.95rem; display: flex; align-items: center; gap: 10px; }
+        .btn-secondary { background: var(--surface-light); color: white; }
+        .btn-danger { background: rgba(255, 69, 58, 0.2); color: var(--danger-color); }
 
-        .help-text { font-size: 0.8rem; color: var(--text-secondary); margin-top: 4px; line-height: 1.4; }
+        /* --- TOAST NOTIFICATIONS --- */
+        #toast-container {
+            position: fixed;
+            bottom: calc(var(--bottom-nav-height) + 16px);
+            left: 16px; right: 16px;
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+            pointer-events: none;
+        }
+        .toast {
+            background: var(--surface-light);
+            color: var(--text-primary);
+            padding: 12px 20px;
+            border-radius: 24px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+            opacity: 0;
+            transform: translateY(20px);
+            transition: all 0.3s ease;
+            pointer-events: all;
+        }
+        .toast.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        .toast.success { background: var(--success-color); color: black; }
+        .toast.warning { background: var(--warning-color); color: black; }
+        .toast.error { background: var(--danger-color); color: white; }
+
     </style>
 </head>
 <body>
 
-    <!-- HEADER -->
-    <div class="header-container">
-        <div style="display:flex; align-items:center; gap:10px;">
-            <h1>Barra Scanner</h1>
+    <!-- MAIN SCANNER VIEW -->
+    <div id="scanner-view">
+        <div id="reader"></div>
+        <div id="viewfinder"></div>
+
+        <div class="top-controls">
             <span id="offline-badge" class="badge badge-used" style="display:none;">OFFLINE</span>
-        </div>
-        <div style="display:flex; gap: 15px;">
-            <button class="icon-btn" id="sync-btn" title="Sync">☁️</button>
-            <button class="icon-btn" id="settings-btn" title="Settings">⚙️</button>
+            <button class="icon-btn" id="sync-btn" title="Sync">🔄</button>
         </div>
     </div>
 
-    <!-- MODE SELECTOR -->
-    <div class="mode-selector">
-        <button class="mode-btn active" id="mode-full" onclick="app.setMode('FULL')">FULL PI</button>
-        <button class="mode-btn" id="mode-short" onclick="app.setMode('SHORT')">SHORT</button>
-    </div>
+    <!-- TOAST NOTIFICATION CONTAINER -->
+    <div id="toast-container"></div>
 
-    <!-- BATCH MODE CONTROLS -->
-    <div class="batch-controls">
-        <div class="batch-label">
-            <span>Batch Mode</span>
-            <label class="switch"><input type="checkbox" id="batch-toggle" onchange="app.toggleBatchMode()"><span class="slider"></span></label>
-            <span id="batch-counter" class="badge badge-sent" style="display:none; margin-left:8px; font-size:0.9rem;">0</span>
+    <!-- HISTORY PANEL (SLIDES UP) -->
+    <div id="history-panel" class="panel">
+        <div class="panel-header">
+            <h2>History</h2>
         </div>
-        <select id="batch-layout" class="batch-select" onchange="app.setBatchLayout(this.value)" disabled>
-            <option value="QWERTY">QWERTY</option>
-            <option value="AZERTY">AZERTY</option>
-            <option value="QWERTZU">QWERTZU</option>
-        </select>
-    </div>
-
-    <!-- SCANNER -->
-    <div id="reader"></div>
-    <div style="text-align: center; margin-top: 10px; margin-bottom: 10px;">
-        <button id="scan-file-btn" class="btn-secondary" style="padding: 8px 16px; font-size: 0.9rem; width: auto; margin-top:0;">📷 Scan from Image</button>
-        <input type="file" id="scan-file-input" accept="image/*" style="display: none;">
-    </div>
-    <div id="scan-feedback" style="min-height:20px; text-align:center; font-weight:600;"></div>
-    
-    <!-- LIST -->
-    <div class="log-container" id="history">
-        <div class="log-header">
-            <div class="tabs">
-                <div class="tab active" onclick="app.filterList('all')">All</div>
-                <div class="tab" onclick="app.filterList('pending')">Pending</div>
-                <div class="tab" onclick="app.filterList('sent')">Sent</div>
+        <div class="panel-content">
+            <div id="history-controls">
+                <input type="text" id="search-input" placeholder="🔍 Search code...">
+                <div class="tabs">
+                    <div class="tab active" onclick="app.filterList('all')">All</div>
+                    <div class="tab" onclick="app.filterList('pending')">Pending</div>
+                    <div class="tab" onclick="app.filterList('sent')">Sent</div>
+                </div>
             </div>
-            <input type="text" id="search-input" placeholder="🔍 Search code...">
+            <ul id="log-content"></ul>
         </div>
-        <ul id="log-content"></ul>
     </div>
 
-    <!-- SETTINGS MODAL -->
-    <div id="settings-modal" class="modal-overlay">
-        <div class="modal-content">
-            <h3>Settings</h3>
-            
+    <!-- SETTINGS PANEL (SLIDES UP) -->
+    <div id="settings-panel" class="panel">
+        <div class="panel-header">
+            <h2>Settings</h2>
+        </div>
+        <div class="panel-content">
             <div class="setting-group">
-                <label class="setting-label">Google Apps Script URL</label>
-                <input type="text" id="script-url-input" class="setting-input" placeholder="https://script.google.com/.../exec">
+                <label class="setting-label">Scan Mode</label>
+                <div style="display:flex; background:var(--surface-light); border-radius:12px; padding:4px;">
+                    <button class="mode-btn active" id="mode-full" onclick="app.setMode('FULL')">FULL PI</button>
+                    <button class="mode-btn" id="mode-short" onclick="app.setMode('SHORT')">SHORT</button>
+                </div>
             </div>
 
             <div class="setting-group">
-                <label class="setting-label">Google Form Prefill Link</label>
-                <input type="text" id="form-url-input" class="setting-input" placeholder="https://docs.google.com/forms/d/e/.../viewform?entry.123={{CODE}}">
-                <p class="help-text">Use placeholders: <code>{{CODE}}</code>, <code>{{MODE}}</code>, <code>{{LAYOUT}}</code></p>
+                <label class="setting-label">Batch Mode</label>
+                <div class="switch-group">
+                    <span>Enable Batch Scanning</span>
+                    <label class="switch"><input type="checkbox" id="batch-toggle" onchange="app.toggleBatchMode()"><span class="slider"></span></label>
+                </div>
+                <select id="batch-layout" class="setting-input" onchange="app.setBatchLayout(this.value)" disabled style="margin-top:12px;">
+                    <option value="QWERTY">QWERTY Layout</option>
+                    <option value="AZERTY">AZERTY Layout</option>
+                    <option value="QWERTZU">QWERTZU Layout</option>
+                </select>
+            </div>
+
+            <div class="setting-group">
+                <label class="setting-label">Cloud Sync</label>
+                <input type="text" id="script-url-input" class="setting-input" placeholder="Google Apps Script URL">
             </div>
 
             <div class="setting-group">
                 <label class="setting-label">Validation Rules</label>
-                <div style="display:flex; justify-content:space-between; margin-bottom:10px;">
-                    <span>OCR Correction (0/O, 1/I)</span>
+                <div class="switch-group" style="margin-bottom:12px;">
+                    <span>OCR Correction (0/O)</span>
                     <label class="switch"><input type="checkbox" id="ocr-toggle"><span class="slider"></span></label>
                 </div>
-                <input type="text" id="full-prefix" class="setting-input" value="02PI20" placeholder="Full Prefix (e.g. 02PI20)">
-                <input type="text" id="short-prefix" class="setting-input" value="MUSTBRUN" placeholder="Short Prefix (e.g. MUSTBRUN)" style="margin-top:8px;">
+                <input type="text" id="full-prefix" class="setting-input" placeholder="Full Prefix (e.g. 02PI20)">
+                <input type="text" id="short-prefix" class="setting-input" placeholder="Short Prefix (e.g. MUSTBRUN)" style="margin-top:8px;">
             </div>
 
-            <button class="btn btn-secondary" onclick="app.exportCSV()">Export CSV</button>
-            <button class="btn btn-danger" onclick="app.clearDatabase()">Clear Database</button>
-            <button class="btn btn-primary" onclick="document.getElementById('settings-modal').style.display='none'">Close</button>
+            <div class="setting-group">
+                <label class="setting-label">Data Management</label>
+                <button class="btn btn-secondary" onclick="app.exportCSV()">Export as CSV</button>
+                <button class="btn btn-danger" onclick="app.clearDatabase()">Clear All Local Data</button>
+            </div>
         </div>
     </div>
 
-    <!-- LAYOUT MODAL -->
-    <div id="layout-modal" class="modal-overlay">
-        <div class="modal-content">
-            <h3>Select Layout</h3>
-            <p id="layout-prompt-code" class="item-code" style="margin-bottom: 20px;"></p>
-            <button class="btn btn-primary" onclick="app.confirmScan('QWERTY')">QWERTY</button>
-            <button class="btn btn-primary" onclick="app.confirmScan('AZERTY')">AZERTY</button>
-            <button class="btn btn-primary" onclick="app.confirmScan('QWERTZU')">QWERTZU</button>
-            <button class="btn btn-secondary" onclick="app.cancelScan()">Cancel</button>
-        </div>
-    </div>
-
-    <!-- SYNC MODAL -->
-    <div id="sync-modal" class="modal-overlay">
-        <div class="modal-content">
-            <h3>Sync Pending</h3>
-            <p class="help-text">Click "Open Form" to submit data. Then click "Mark Sent".</p>
-            <button class="btn btn-primary" onclick="app.syncToScript()" style="margin-bottom: 15px; background-color: #0097a7;">🚀 Sync to Cloud (Direct)</button>
-            <div id="sync-list" style="max-height: 300px; overflow-y: auto; margin: 10px 0;"></div>
-            <button class="btn btn-secondary" onclick="document.getElementById('sync-modal').style.display='none'">Close</button>
-        </div>
-    </div>
+    <!-- BOTTOM NAVIGATION BAR -->
+    <nav id="bottom-nav">
+        <button class="nav-btn" id="nav-history-btn">
+            <span class="icon">📄</span>
+            <span>History</span>
+        </button>
+        <button class="nav-btn" id="nav-scan-file-btn">
+            <span class="icon">🖼️</span>
+            <span>Scan Image</span>
+        </button>
+        <input type="file" id="scan-file-input" accept="image/*" style="display: none;">
+        <button class="nav-btn" id="nav-settings-btn">
+            <span class="icon">⚙️</span>
+            <span>Settings</span>
+        </button>
+    </nav>
 
     <script>
         /**
@@ -479,10 +537,11 @@
             },
 
             bindEvents() {
-                document.getElementById('settings-btn').onclick = () => document.getElementById('settings-modal').style.display = 'flex';
                 document.getElementById('sync-btn').onclick = () => this.runFullSync();
                 document.getElementById('search-input').oninput = (e) => this.renderList(e.target.value);
 
+                document.getElementById('nav-history-btn').onclick = () => this.showPanel('history-panel');
+                document.getElementById('nav-settings-btn').onclick = () => this.showPanel('settings-panel');
                 document.getElementById('scan-file-btn').onclick = () => document.getElementById('scan-file-input').click();
                 document.getElementById('scan-file-input').onchange = (e) => this.scanImageFile(e);
                 
@@ -505,6 +564,16 @@
                 badge.style.display = navigator.onLine ? 'none' : 'block';
             },
 
+            showPanel(panelId) {
+                // Close any open panels first
+                document.querySelectorAll('.panel.visible').forEach(p => p.classList.remove('visible'));
+                // Open the requested panel
+                const panel = document.getElementById(panelId);
+                if (panel) {
+                    panel.classList.add('visible');
+                }
+            },
+
             setMode(newMode) {
                 this.mode = newMode;
                 document.getElementById('mode-full').className = `mode-btn ${newMode === 'FULL' ? 'active' : ''}`;
@@ -514,15 +583,20 @@
             toggleBatchMode() {
                 this.batchMode = document.getElementById('batch-toggle').checked;
                 document.getElementById('batch-layout').disabled = !this.batchMode;
-                
-                const counter = document.getElementById('batch-counter');
-                if (this.batchMode) {
-                    this.batchCount = 0;
-                    counter.innerText = '0';
-                    counter.style.display = 'inline-block';
-                } else {
-                    counter.style.display = 'none';
-                }
+            },
+
+            showToast(message, type = 'info', duration = 3000) {
+                const container = document.getElementById('toast-container');
+                const toast = document.createElement('div');
+                toast.className = `toast ${type}`;
+                toast.innerText = message;
+                container.appendChild(toast);
+                setTimeout(() => toast.classList.add('show'), 10); // Animate in
+
+                setTimeout(() => {
+                    toast.classList.remove('show');
+                    toast.addEventListener('transitionend', () => toast.remove());
+                }, duration);
             },
 
             setBatchLayout(layout) {
@@ -558,27 +632,22 @@
                                 <span class="badge badge-${scan.pi_mode.toLowerCase()}">${scan.pi_mode}</span>
                                 <span class="badge badge-${scan.status}">${scan.status}</span>
                                 ${scan.used ? '<span class="badge badge-used">USED</span>' : ''}
-                                <span>${new Date(scan.date).toLocaleTimeString()}</span>
+                                <span>${new Date(scan.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                             </div>
                         </div>
+                        <div class="item-actions">
+                            ${!scan.used ? `<button class="btn btn-secondary" onclick="app.markScanUsed(${scan.id})">Mark Used</button>` : ''}
+                        </div>
                     `;
-                    
-                    // Duplicate/Used Logic
-                    if (!scan.used) {
-                        const btn = document.createElement('button');
-                        btn.className = 'btn-secondary';
-                        btn.style.padding = '6px 10px';
-                        btn.style.fontSize = '0.8rem';
-                        btn.innerText = 'Mark Used';
-                        btn.onclick = async () => {
-                            await db.markUsed(scan.id);
-                            this.loadScans();
-                        };
-                        li.appendChild(btn);
-                    }
-                    
                     list.appendChild(li);
                 });
+            },
+
+            async markScanUsed(scanId) {
+                event.stopPropagation(); // Prevent panel from closing if clicked
+                await db.markUsed(scanId);
+                this.loadScans();
+                this.showToast('Marked as used', 'info');
             },
 
             filterList(type) {
@@ -590,8 +659,7 @@
 
             // --- SCAN LOGIC ---
             onScan(rawCode) {
-                const feedback = document.getElementById('scan-feedback');
-                
+                const viewfinder = document.getElementById('viewfinder');
                 // 1. Normalize
                 const normalized = logic.normalize(rawCode);
                 
@@ -603,21 +671,20 @@
 
                 // 3. Validate (Validate the RESULT of conversion)
                 if (!logic.validate(finalCode, this.mode)) {
-                    feedback.innerText = `Invalid ${this.mode} format`;
-                    feedback.style.color = 'var(--danger-color)';
-                    document.body.classList.add('blink-error');
-                    setTimeout(() => document.body.classList.remove('blink-error'), 400);
+                    this.showToast(`Invalid ${this.mode} format`, 'error');
                     return;
                 }
 
                 // 4. Duplicate Check
                 const duplicate = this.scans.find(s => s.code_normalized === finalCode);
                 if (duplicate) {
-                    feedback.innerText = `Duplicate: ${finalCode}`;
-                    feedback.style.color = 'var(--warning-color)';
+                    this.showToast(`Duplicate found`, 'warning');
+                    viewfinder.className = 'warning';
+                    setTimeout(() => viewfinder.className = '', 500);
                     if(navigator.vibrate) navigator.vibrate([50, 50, 50]);
                     return;
                 }
+                this.tempScan = finalCode;
 
                 // 5. Batch Mode Check
                 if (this.batchMode) {
@@ -628,12 +695,12 @@
                     return;
                 }
 
-                // 5. Success -> Ask Layout
-                this.tempScan = finalCode;
-                document.getElementById('layout-prompt-code').innerText = finalCode;
-                document.getElementById('layout-modal').style.display = 'flex';
-                
-                // Feedback: Vibration + Laser Sound
+                // 6. Success -> Ask Layout (For now, we auto-select QWERTY for simplicity)
+                this.confirmScan('QWERTY');
+
+                // Visual/Haptic Feedback
+                viewfinder.className = 'success';
+                setTimeout(() => viewfinder.className = '', 500);
                 if(navigator.vibrate) navigator.vibrate(200);
                 this.laserSound.currentTime = 0;
                 this.laserSound.play().catch(e => console.warn("Audio play failed", e));
@@ -653,16 +720,8 @@
 
                 await db.addScan(record);
                 this.loadScans();
-                
-                if (!this.batchMode) {
-                    document.getElementById('layout-modal').style.display = 'none';
-                }
-                document.getElementById('scan-feedback').innerText = `Saved: ${this.tempScan}`;
-                document.getElementById('scan-feedback').style.color = 'var(--success-color)';
-            },
 
-            cancelScan() {
-                document.getElementById('layout-modal').style.display = 'none';
+                this.showToast(`Saved: ${this.tempScan}`, 'success');
             },
 
             // --- AUTO SYNC ---
@@ -698,16 +757,11 @@
                 }
                 syncBtn.disabled = true;
                 
-                const feedback = document.getElementById('scan-feedback');
-                const showFeedback = (msg, color) => {
-                    // Only show feedback if not silent, or if it's an error
-                    if (!silent || color === 'danger') {
-                        feedback.innerText = msg;
-                        feedback.style.color = `var(--${color}-color)`;
-                    }
-                };
+                const showSyncFeedback = (msg, type) => {
+                    if (!silent || type === 'error') this.showToast(msg, type);
+                }
 
-                if (!silent) showFeedback('Syncing...', 'text-secondary');
+                if (!silent) showSyncFeedback('Syncing...', 'info');
 
                 try {
                     // Step 1: Push local changes to the server
@@ -732,7 +786,7 @@
                     const newItems = await this.mergeScans(serverScans);
                     
                     if (!silent) {
-                        showFeedback(`Sync complete. ${newItems} new items added.`, 'success');
+                        showSyncFeedback(`Sync complete. ${newItems} new items added.`, 'success');
                     } else if (newItems > 0) {
                         console.log(`Auto-sync: Merged ${newItems} new items from server.`);
                     }
@@ -743,14 +797,6 @@
                 } finally {
                     syncBtn.innerText = originalIcon;
                     syncBtn.disabled = false;
-                    // Clear feedback only if it was a manual sync or an error was shown
-                    if (!silent || feedback.innerText.startsWith('Sync Failed')) {
-                        setTimeout(() => {
-                            if (feedback.innerText.startsWith('Sync')) {
-                                feedback.innerText = '';
-                            }
-                        }, 5000);
-                    }
                 }
             },
 
@@ -781,27 +827,24 @@
             },
 
             async scanImageFile(event) {
-                const feedback = document.getElementById('scan-feedback');
                 if (!event.target.files || event.target.files.length === 0) {
                     return;
                 }
                 const imageFile = event.target.files[0];
 
-                feedback.innerText = 'Scanning image...';
-                feedback.style.color = 'var(--text-secondary)';
+                this.showToast('Scanning image...', 'info');
 
                 try {
                     // Temporarily stop the video scanner to avoid conflicts
-                    if (this.scanner) {
-                        await this.scanner.clear().catch(err => console.error("Scanner clear failed", err));
+                    if (this.scanner && this.scanner.isScanning) {
+                        await this.scanner.stop();
                     }
                     const html5QrCode = new Html5Qrcode("reader");
                     const decodedText = await html5QrCode.scanFile(imageFile, true); // showImage = true
                     this.onScan(decodedText);
                 } catch (err) {
                     console.error('File scan error:', err);
-                    feedback.innerText = 'No barcode found in image.';
-                    feedback.style.color = 'var(--danger-color)';
+                    this.showToast('No barcode found in image.', 'error');
                 } finally {
                     this.startScanner(); // Restart video scanner
                     event.target.value = ''; // Clear input to allow re-scanning same file
@@ -821,67 +864,6 @@
                 }
                 if (newScansAdded > 0) { await this.loadScans(); }
                 return newScansAdded;
-            },
-
-            openSyncModal() {
-                const pending = this.scans.filter(s => s.status === 'pending');
-                const container = document.getElementById('sync-list');
-                container.innerHTML = '';
-
-                if (pending.length === 0) {
-                    container.innerHTML = '<div style="text-align:center; padding:20px; color:#888;">No pending items.</div>';
-                } else {
-                    pending.forEach(item => {
-                        const div = document.createElement('div');
-                        div.style.cssText = 'display:flex; justify-content:space-between; align-items:center; padding:10px; border-bottom:1px solid #333;';
-                        
-                        const info = document.createElement('span');
-                        info.innerText = item.code_normalized;
-                        
-                        const actions = document.createElement('div');
-                        actions.style.display = 'flex';
-                        actions.style.gap = '8px';
-
-                        const btnOpen = document.createElement('button');
-                        btnOpen.className = 'btn-primary';
-                        btnOpen.style.padding = '6px 12px';
-                        btnOpen.style.fontSize = '0.8rem';
-                        btnOpen.innerText = 'Open Form';
-                        btnOpen.onclick = () => this.openForm(item);
-
-                        const btnMark = document.createElement('button');
-                        btnMark.className = 'btn-secondary';
-                        btnMark.style.padding = '6px 12px';
-                        btnMark.style.fontSize = '0.8rem';
-                        btnMark.innerText = 'Mark Sent';
-                        btnMark.onclick = async () => {
-                            await db.updateStatus(item.id, 'sent');
-                            this.openSyncModal(); // refresh
-                            this.loadScans();
-                        };
-
-                        actions.appendChild(btnOpen);
-                        actions.appendChild(btnMark);
-                        div.appendChild(info);
-                        div.appendChild(actions);
-                        container.appendChild(div);
-                    });
-                }
-                document.getElementById('sync-modal').style.display = 'flex';
-            },
-
-            openForm(item) {
-                let url = logic.settings.formUrl;
-                if (!url) {
-                    alert('Please configure Form URL in Settings first.');
-                    return;
-                }
-                // Replace placeholders
-                url = url.replace('{{CODE}}', item.code_normalized)
-                         .replace('{{MODE}}', item.pi_mode)
-                         .replace('{{LAYOUT}}', item.layout);
-                
-                window.open(url, '_blank');
             },
 
             async syncToScript() { // This is called from the modal
@@ -951,24 +933,36 @@
                 }
             },
 
-            startScanner() {
-                this.scanner = new Html5QrcodeScanner(
-                    "reader", { 
-                    fps: 30, 
-                    qrbox: {width: 280, height: 150},
-                    formatsToSupport: [
-                        Html5QrcodeSupportedFormats.QR_CODE,
-                        Html5QrcodeSupportedFormats.CODE_128,
-                        Html5QrcodeSupportedFormats.CODE_39,
-                        Html5QrcodeSupportedFormats.EAN_13,
-                        Html5QrcodeSupportedFormats.UPC_A
-                    ]
-                }, false);
-                
-                this.scanner.render(
-                    (decodedText) => this.onScan(decodedText),
-                    (error) => { /* ignore frame errors */ }
-                );
+            async startScanner() {
+                this.scanner = new Html5Qrcode("reader");
+                const config = { 
+                    fps: 10,
+                    // No qrbox needed, we use a CSS overlay
+                };
+
+                try {
+                    const cameras = await Html5Qrcode.getCameras();
+                    if (cameras && cameras.length) {
+                        let cameraId = cameras[0].id; // Fallback to first camera
+                        // Prefer back camera
+                        const backCamera = cameras.find(c => c.label.toLowerCase().includes('back'));
+                        if (backCamera) {
+                            cameraId = backCamera.id;
+                        }
+                        
+                        await this.scanner.start(
+                            cameraId, 
+                            config,
+                            (decodedText) => this.onScan(decodedText),
+                            (errorMessage) => { /* ignore scan errors */ }
+                        );
+                    } else {
+                        this.showToast('No cameras found on this device.', 'error');
+                    }
+                } catch (err) {
+                    console.error("Camera start error:", err);
+                    this.showToast(`Camera Error: ${err.name}`, 'error');
+                }
             }
         };
 
