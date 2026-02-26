@@ -462,6 +462,7 @@
             batchCount: 0,
             batchLayout: 'QWERTY',
             laserSound: new Audio("https://assets.mixkit.co/active_storage/sfx/600/600-preview.mp3"),
+            syncIntervalId: null,
 
             async init() {
                 await db.init();
@@ -470,6 +471,7 @@
                 this.loadScans();
                 this.startScanner();
                 this.updateOnlineStatus();
+                this.startAutoSync();
             },
 
             bindEvents() {
@@ -481,8 +483,14 @@
                 document.querySelectorAll('.setting-input').forEach(el => el.onblur = () => logic.saveSettings());
                 document.getElementById('ocr-toggle').onchange = () => logic.saveSettings();
 
-                window.addEventListener('online', () => this.updateOnlineStatus());
-                window.addEventListener('offline', () => this.updateOnlineStatus());
+                window.addEventListener('online', () => {
+                    this.updateOnlineStatus();
+                    this.startAutoSync();
+                });
+                window.addEventListener('offline', () => {
+                    this.updateOnlineStatus();
+                    this.stopAutoSync();
+                });
             },
 
             updateOnlineStatus() {
@@ -650,46 +658,77 @@
                 document.getElementById('layout-modal').style.display = 'none';
             },
 
+            // --- AUTO SYNC ---
+            startAutoSync() {
+                if (this.syncIntervalId) return; // Already running
+                if (!navigator.onLine) return; // Don't start if offline
+
+                this.syncIntervalId = setInterval(async () => {
+                    if (navigator.onLine) {
+                        console.log('Auto-sync: Running...');
+                        await this.runFullSync(true); // Run in silent mode
+                    }
+                }, 10000); // 10 seconds
+                console.log('Auto-sync: Service started.');
+            },
+
+            stopAutoSync() {
+                if (this.syncIntervalId) {
+                    clearInterval(this.syncIntervalId);
+                    this.syncIntervalId = null;
+                    console.log('Auto-sync: Service stopped.');
+                }
+            },
+
             // --- SYNC LOGIC ---
-            async runFullSync() {
+            async runFullSync(silent = false) {
                 const syncBtn = document.getElementById('sync-btn');
                 if (syncBtn.disabled) return; // Prevent multiple clicks
 
                 const originalIcon = syncBtn.innerText;
-                syncBtn.innerText = '🔄';
+                if (!silent) {
+                    syncBtn.innerText = '🔄';
+                }
                 syncBtn.disabled = true;
                 
                 const feedback = document.getElementById('scan-feedback');
                 const showFeedback = (msg, color) => {
-                    feedback.innerText = msg;
-                    feedback.style.color = `var(--${color}-color)`;
+                    // Only show feedback if not silent, or if it's an error
+                    if (!silent || color === 'danger') {
+                        feedback.innerText = msg;
+                        feedback.style.color = `var(--${color}-color)`;
+                    }
                 };
 
-                showFeedback('Syncing...', 'text-secondary');
+                if (!silent) showFeedback('Syncing...', 'text-secondary');
 
                 try {
                     // Step 1: Push local changes to the server
                     const pending = this.scans.filter(s => s.status === 'pending');
                     if (pending.length > 0) {
-                        showFeedback(`Pushing ${pending.length} items...`, 'text-secondary');
-                        const pushResult = await this.pushToServer(pending, true); // silent mode
+                        if (!silent) showFeedback(`Pushing ${pending.length} items...`, 'text-secondary');
+                        const pushResult = await this.pushToServer(pending, true); // silent mode for sub-op
                         if (!pushResult.success) {
                             throw new Error(`Push failed: ${pushResult.message}`);
                         }
                     }
 
                     // Step 2: Pull all data from the server
-                    showFeedback('Fetching from cloud...', 'text-secondary');
+                    if (!silent) showFeedback('Fetching from cloud...', 'text-secondary');
                     const serverScans = await this.pullFromServer();
                     if (serverScans === null) { // pullFromServer returns null on failure
                         throw new Error("Pull from server failed. Check console.");
                     }
 
                     // Step 3: Merge server data into local DB
-                    showFeedback('Merging data...', 'text-secondary');
+                    if (!silent) showFeedback('Merging data...', 'text-secondary');
                     const newItems = await this.mergeScans(serverScans);
                     
-                    showFeedback(`Sync complete. ${newItems} new items added.`, 'success');
+                    if (!silent) {
+                        showFeedback(`Sync complete. ${newItems} new items added.`, 'success');
+                    } else if (newItems > 0) {
+                        console.log(`Auto-sync: Merged ${newItems} new items from server.`);
+                    }
 
                 } catch (e) {
                     console.error('Full sync failed:', e);
@@ -697,11 +736,14 @@
                 } finally {
                     syncBtn.innerText = originalIcon;
                     syncBtn.disabled = false;
-                    setTimeout(() => {
-                        if (feedback.innerText.startsWith('Sync')) {
-                            feedback.innerText = '';
-                        }
-                    }, 5000);
+                    // Clear feedback only if it was a manual sync or an error was shown
+                    if (!silent || feedback.innerText.startsWith('Sync Failed')) {
+                        setTimeout(() => {
+                            if (feedback.innerText.startsWith('Sync')) {
+                                feedback.innerText = '';
+                            }
+                        }, 5000);
+                    }
                 }
             },
 
@@ -884,11 +926,8 @@
                         Html5QrcodeSupportedFormats.EAN_13,
                         Html5QrcodeSupportedFormats.UPC_A
                     ],
-                    videoConstraints: { 
-                        facingMode: "environment",
-                        width: { ideal: 1920 },
-                        height: { ideal: 1080 },
-                        advanced: [{ focusMode: "continuous" }]
+                    videoConstraints: {
+                        facingMode: "environment"
                     }
                 }, false);
                 
