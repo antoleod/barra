@@ -1,4 +1,4 @@
-﻿﻿const CACHE = "barra-scanner-v13-force-refresh";
+﻿﻿const CACHE = "barra-scanner-v14-force-refresh";
 const CORE = [
   "./",
   "./index.html",
@@ -48,8 +48,14 @@ self.addEventListener("fetch", (event) => {
       cached ||
       fetch(event.request)
         .then((res) => {
-          const copy = res.clone();
-          caches.open(CACHE).then((cache) => cache.put(event.request, copy));
+          // Only cache same-origin requests or known CDN files from CORE
+          const url = new URL(event.request.url);
+          const isSameOrigin = url.origin === self.location.origin;
+          const isCoreCdn = CORE.some((c) => c.startsWith("http") && url.href.startsWith(c));
+          if (isSameOrigin || isCoreCdn) {
+            const copy = res.clone();
+            caches.open(CACHE).then((cache) => cache.put(event.request, copy));
+          }
           return res;
         })
         .catch(() => {
