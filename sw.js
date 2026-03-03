@@ -1,4 +1,4 @@
-﻿const CACHE = "barra-scanner-v8-local-dev-fix";
+﻿const CACHE = "barra-scanner-v9-secure-config";
 const CORE = [
   "./",
   "./index.html",
@@ -6,7 +6,7 @@ const CORE = [
   "./styles.css",
   "./app.js",
   "./login.js",
-  "./firebase-config.js", // Cachear la configuración
+  "/__/firebase/init.json", // Cachear la configuración automática
   "./firebase-service.js",
   "./manifest.webmanifest",
   "./icon.svg",

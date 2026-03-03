@@ -24,7 +24,13 @@ import {
     Timestamp,
     serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
-import { firebaseConfig } from "./firebase-config.js";
+
+// Este top-level await pausará la ejecución del módulo hasta que la configuración se obtenga.
+// Solo funciona en un contexto de módulo (lo cual ya usas).
+// **Importante**: Esto fallará en un servidor genérico (como Live Server), lo cual es intencional.
+// Debes usar `firebase serve` para el desarrollo local (ver Paso 3).
+const response = await fetch('/__/firebase/init.json');
+const firebaseConfig = await response.json();
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
