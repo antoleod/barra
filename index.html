@@ -10,6 +10,7 @@
   <meta name="theme-color" content="#0b0d10" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <script src="https://unpkg.com/html5-qrcode"></script>
   <script>
     try {
       const settings = JSON.parse(localStorage.getItem("barra_settings") || "{}");
@@ -31,7 +32,6 @@
   <div class="app-shell" style="display: none;">
     <header class="app-header top">
       <div class="pill"><span id="dot" class="dot"></span><span>Barra Scanner</span></div>
-      <script src="https://unpkg.com/html5-qrcode"></script>
       <button class="icon-btn" id="sync-btn" aria-label="Sync"><span data-i18n="icon_sync">⟳</span></button>
     </header>
 
@@ -102,7 +102,51 @@
     <header class="ph">
       <div class="title" data-i18n="header_settings">Settings</div><button class="icon-btn" data-close="settings">✕</button>
     </header>
-    <div class="pc"></div>
+    <div class="pc">
+      <div style="margin-bottom:14px">
+        <label class="label">Modo de escaneo</label>
+        <div class="seg">
+          <button id="mode-full" class="mode on" type="button">FULL PI</button>
+          <button id="mode-short" class="mode" type="button">SHORT</button>
+        </div>
+      </div>
+      <div style="margin-bottom:14px">
+        <label class="label">Batch</label>
+        <div class="row">
+          <span>Activar escaneo por lote</span>
+          <label class="sw">
+            <input type="checkbox" id="batch-toggle" />
+            <span class="sl"></span>
+          </label>
+        </div>
+        <select id="batch-layout" class="select" disabled>
+          <option value="QWERTY">QWERTY</option>
+          <option value="AZERTY">AZERTY</option>
+          <option value="QWERTZU">QWERTZU</option>
+        </select>
+      </div>
+      <div style="margin-bottom:14px">
+        <label class="label">Google Apps Script URL</label>
+        <input id="script-url" class="input" placeholder="https://script.google.com/.../exec" />
+      </div>
+      <div style="margin-bottom:14px">
+        <label class="label">Validacion</label>
+        <div class="row">
+          <span>OCR correction (O a 0)</span>
+          <label class="sw">
+            <input type="checkbox" id="ocr-toggle" />
+            <span class="sl"></span>
+          </label>
+        </div>
+        <input id="full-prefix" class="input" placeholder="Full prefix" />
+        <input id="short-prefix" class="input" placeholder="Short prefix" style="margin-top:8px" />
+      </div>
+      <div>
+        <label class="label">Datos locales</label>
+        <button id="export-btn" class="btn" style="width:100%;margin-bottom:8px">Exportar CSV</button>
+        <button id="clear-btn" class="btn btn-danger" style="width:100%">Borrar historial local</button>
+      </div>
+    </div>
   </section>
   <script type="module" src="app.js"></script>
 </body>
