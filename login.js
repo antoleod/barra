@@ -68,6 +68,9 @@ btnGoogle.onclick = async () => {
     } else {
       setStatus("Authentication error.");
     }
+  } else {
+    setStatus("Login successful. Redirecting...", "success");
+    window.location.replace('./index.html');
   }
 };
 
@@ -89,8 +92,10 @@ btnPinLogin.onclick = async () => {
   if (!res.success) {
     setLoading(btnPinLogin, false);
     setStatus(res.error);
-  } else if (res.isNew) {
-    setStatus("Account created. Redirecting...", "success");
+  } else {
+    const message = res.isNew ? "Account created. Redirecting..." : "Login successful. Redirecting...";
+    setStatus(message, "success");
+    window.location.replace('./index.html');
   }
 };
 
