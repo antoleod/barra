@@ -1,53 +1,82 @@
 import { fbService } from "./firebase-service.js";
 
-// --- DB MODULE (IndexedDB Wrapper) ---
+// Helper function to promisify IndexedDB requests. It wraps an IDBRequest
+// object in a Promise, resolving on success and rejecting on error.
+function promisifyRequest(request) {
+    return new Promise((resolve, reject) => {
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+    });
+}
+
+// Helper function to promisify IndexedDB transactions. It resolves when the
+// transaction is complete and rejects if it errors or is aborted.
+function promisifyTransaction(tx) {
+    return new Promise((resolve, reject) => {
+        tx.oncomplete = resolve;
+        tx.onerror = () => reject(tx.error);
+        tx.onabort = () => reject(tx.error);
+    });
+}
+
+// --- DB MODULE (IndexedDB Wrapper - Refactored with async/await) ---
 const db = {
     dbName: "BarraScannerDB", version: 1, instance: null,
-    init() {
-        return new Promise((r, j) => {
-            const q = indexedDB.open(this.dbName, this.version);
-            q.onupgradeneeded = e => {
-                const d = e.target.result;
-                if (!d.objectStoreNames.contains("scans")) {
-                    const s = d.createObjectStore("scans", { keyPath: "id", autoIncrement: true });
-                    s.createIndex("code_normalized", "code_normalized", { unique: false });
-                    s.createIndex("status", "status", { unique: false });
+    async init() {
+        this.instance = await new Promise((resolve, reject) => {
+            const request = indexedDB.open(this.dbName, this.version);
+            request.onupgradeneeded = e => {
+                const dbInstance = e.target.result;
+                if (!dbInstance.objectStoreNames.contains("scans")) {
+                    const store = dbInstance.createObjectStore("scans", { keyPath: "id", autoIncrement: true });
+                    store.createIndex("code_normalized", "code_normalized", { unique: false });
+                    store.createIndex("status", "status", { unique: false });
                 }
             };
-            q.onsuccess = e => { this.instance = e.target.result; r(this.instance) };
-            q.onerror = e => j(e)
-        })
+            request.onsuccess = () => resolve(request.result);
+            request.onerror = e => reject(e.target.error);
+        });
+        return this.instance;
     },
-    addScan(x) {
-        return new Promise((r, j) => {
-            const t = this.instance.transaction(["scans"], "readwrite");
-            const q = t.objectStore("scans").add(x);
-            q.onsuccess = () => r(q.result);
-            q.onerror = () => j(q.error)
-        })
+    async addScan(scanData) {
+        const tx = this.instance.transaction(["scans"], "readwrite");
+        const store = tx.objectStore("scans");
+        const result = await promisifyRequest(store.add(scanData));
+        await promisifyTransaction(tx);
+        return result;
     },
-    getAll() {
-        return new Promise(r => {
-            const q = this.instance.transaction(["scans"], "readonly").objectStore("scans").getAll();
-            q.onsuccess = () => r(q.result || [])
-        })
+    async getAll() {
+        const tx = this.instance.transaction(["scans"], "readonly");
+        const store = tx.objectStore("scans");
+        const results = await promisifyRequest(store.getAll());
+        return results || [];
     },
     async updateStatus(id, status) {
-        const t = this.instance.transaction(["scans"], "readwrite").objectStore("scans");
-        const item = await new Promise(r => { const q = t.get(id); q.onsuccess = e => r(e.target.result) });
-        if (item) { item.status = status; t.put(item) }
+        const tx = this.instance.transaction(["scans"], "readwrite");
+        const store = tx.objectStore("scans");
+        const item = await promisifyRequest(store.get(id));
+        if (item) {
+            item.status = status;
+            await promisifyRequest(store.put(item));
+        }
+        return promisifyTransaction(tx);
     },
     async markUsed(id) {
-        const t = this.instance.transaction(["scans"], "readwrite").objectStore("scans");
-        const item = await new Promise(r => { const q = t.get(id); q.onsuccess = e => r(e.target.result) });
-        if (item) { item.used = true; item.dateUsed = new Date().toISOString(); t.put(item) }
+        const tx = this.instance.transaction(["scans"], "readwrite");
+        const store = tx.objectStore("scans");
+        const item = await promisifyRequest(store.get(id));
+        if (item) {
+            item.used = true;
+            item.dateUsed = new Date().toISOString();
+            await promisifyRequest(store.put(item));
+        }
+        return promisifyTransaction(tx);
     },
-    clear() {
-        return new Promise(r => {
-            const t = this.instance.transaction(["scans"], "readwrite");
-            t.objectStore("scans").clear();
-            t.oncomplete = r
-        })
+    async clear() {
+        const tx = this.instance.transaction(["scans"], "readwrite");
+        const store = tx.objectStore("scans");
+        await promisifyRequest(store.clear());
+        return promisifyTransaction(tx);
     }
 };
 
@@ -63,7 +92,9 @@ const i18n = {
         status_stop_cam: "Camera stopped",
         status_error_cam: "Could not open camera",
         nav_history: "History", nav_image: "Image", nav_nfc: "NFC", nav_sync: "Sync", nav_settings: "Settings",
+        status_loading_hist: "Please wait, loading history...",
         header_history: "History", header_settings: "Settings",
+        lbl_dark_mode: "Dark Mode", lbl_enable_dark_mode: "Enable Dark Mode", theme_midnight: "Midnight", theme_sunset: "Sunset", theme_forest: "Forest", theme_ice: "Ice",
         lbl_language: "Language", lbl_scan_mode: "Scan Mode", lbl_batch: "Batch", lbl_batch_enable: "Enable batch scanning",
         lbl_validation: "Validation", lbl_ocr: "OCR correction (O to 0)", lbl_theme: "Visual Theme", lbl_local_data: "Local Data",
         lbl_connected_as: "CONNECTED AS",
@@ -87,7 +118,9 @@ const i18n = {
         status_stop_cam: "Cámara detenida",
         status_error_cam: "No se pudo abrir la cámara",
         nav_history: "Historial", nav_image: "Imagen", nav_nfc: "NFC", nav_sync: "Sync", nav_settings: "Ajustes",
+        status_loading_hist: "Por favor espera, cargando historial...",
         header_history: "Historial", header_settings: "Ajustes",
+        lbl_dark_mode: "Modo Oscuro", lbl_enable_dark_mode: "Activar Modo Oscuro", theme_midnight: "Medianoche", theme_sunset: "Atardecer", theme_forest: "Bosque", theme_ice: "Hielo",
         lbl_language: "Idioma", lbl_scan_mode: "Modo de Escaneo", lbl_batch: "Lote (Batch)", lbl_batch_enable: "Activar escaneo por lote",
         lbl_validation: "Validación", lbl_ocr: "Corrección OCR (O a 0)", lbl_theme: "Tema Visual", lbl_local_data: "Datos Locales",
         lbl_connected_as: "CONECTADO COMO",
@@ -111,7 +144,9 @@ const i18n = {
         status_stop_cam: "Caméra arrêtée",
         status_error_cam: "Impossible d'ouvrir la caméra",
         nav_history: "Historique", nav_image: "Image", nav_nfc: "NFC", nav_sync: "Sync", nav_settings: "Paramètres",
+        status_loading_hist: "Veuillez patienter, chargement de l'historique...",
         header_history: "Historique", header_settings: "Paramètres",
+        lbl_dark_mode: "Mode Sombre", lbl_enable_dark_mode: "Activer le mode sombre", theme_midnight: "Minuit", theme_sunset: "Crépuscule", theme_forest: "Forêt", theme_ice: "Glace",
         lbl_language: "Langue", lbl_scan_mode: "Mode de Scan", lbl_batch: "Lot (Batch)", lbl_batch_enable: "Activer scan par lot",
         lbl_validation: "Validation", lbl_ocr: "Correction OCR (O vers 0)", lbl_theme: "Thème Visuel", lbl_local_data: "Données Locales",
         lbl_connected_as: "CONNECTÉ EN TANT QUE",
@@ -129,12 +164,20 @@ const i18n = {
 
 // --- LOGIC MODULE ---
 const logic = {
-    settings: { fullPrefix: "02PI20", shortPrefix: "MUSTBRUN", ocrCorrection: true, scriptUrl: "", theme: "midnight", lang: "en" },
+    settings: { fullPrefix: "02PI20", shortPrefix: "MUSTBRUN", ocrCorrection: true, scriptUrl: "", theme: "midnight", lang: "en", darkMode: true },
     t(key) {
         const l = this.settings.lang || "en";
         return (i18n[l] && i18n[l][key]) || i18n["en"][key] || key;
     },
     applyTheme(theme) {
+        // If Dark Mode is disabled, force 'light' theme regardless of selection
+        if (!this.settings.darkMode) {
+            document.documentElement.setAttribute("data-theme", "light");
+            const themeMeta = document.querySelector('meta[name="theme-color"]');
+            if (themeMeta) themeMeta.setAttribute("content", "#ffffff");
+            return;
+        }
+
         const validThemes = new Set(["midnight", "sunset", "forest", "ice"]);
         const selected = validThemes.has(theme) ? theme : "midnight";
         document.documentElement.setAttribute("data-theme", selected);
@@ -144,7 +187,8 @@ const logic = {
                 midnight: "#0d1117",
                 sunset: "#1a1212",
                 forest: "#0d1712",
-                ice: "#10161f"
+                ice: "#10161f",
+                light: "#ffffff"
             };
             themeMeta.setAttribute("content", colorByTheme[selected] || colorByTheme.midnight);
         }
@@ -155,8 +199,13 @@ const logic = {
         document.getElementById("full-prefix").value = this.settings.fullPrefix;
         document.getElementById("short-prefix").value = this.settings.shortPrefix;
         document.getElementById("ocr-toggle").checked = this.settings.ocrCorrection;
-        const themeSelect = document.getElementById("theme-select");
-        if (themeSelect) themeSelect.value = this.settings.theme || "midnight";
+        document.querySelectorAll(".theme-btn").forEach(btn => {
+            btn.classList.toggle("on", btn.dataset.theme === (this.settings.theme || "midnight"));
+        });
+        const dmToggle = document.getElementById("dark-mode-toggle");
+        if (dmToggle) dmToggle.checked = this.settings.darkMode !== false; // Default true
+        const themeContainer = document.getElementById("theme-selector-container");
+        if (themeContainer) themeContainer.style.display = dmToggle.checked ? 'block' : 'none';
         const langSelect = document.getElementById("lang-select");
         if (langSelect) langSelect.value = this.settings.lang || "en";
         this.applyTheme(this.settings.theme);
@@ -165,8 +214,13 @@ const logic = {
         this.settings.fullPrefix = document.getElementById("full-prefix").value.trim();
         this.settings.shortPrefix = document.getElementById("short-prefix").value.trim();
         this.settings.ocrCorrection = document.getElementById("ocr-toggle").checked;
-        const themeSelect = document.getElementById("theme-select");
-        if (themeSelect) this.settings.theme = themeSelect.value;
+        this.settings.darkMode = document.getElementById("dark-mode-toggle").checked;
+        const selectedThemeBtn = document.querySelector(".theme-btn.on");
+        if (selectedThemeBtn) {
+            this.settings.theme = selectedThemeBtn.dataset.theme;
+        }
+        const themeContainer = document.getElementById("theme-selector-container");
+        if (themeContainer) themeContainer.style.display = this.settings.darkMode ? 'block' : 'none';
         const langSelect = document.getElementById("lang-select");
         if (langSelect) this.settings.lang = langSelect.value;
         this.applyTheme(this.settings.theme);
@@ -198,7 +252,7 @@ const logic = {
 
 // --- APP MODULE ---
 const app = {
-    mode: "FULL", scans: [], tempScan: null, filter: "all", scanner: null, scannerState: "idle", batchMode: false, batchCount: 0, batchLayout: "QWERTY", syncIntervalId: null, isHandling: false, lastCode: "", lastAt: 0, restartTimer: null, pauseMs: 1300, appInitialized: false, confirmCallback: null,
+    mode: "FULL", scans: [], tempScan: null, filter: "all", scanner: null, scannerState: "idle", batchMode: false, batchCount: 0, batchLayout: "QWERTY", syncIntervalId: null, isHandling: false, lastCode: "", lastAt: 0, restartTimer: null, pauseMs: 1300, appInitialized: false, confirmCallback: null, scansLoaded: false,
     
     async init(user) {
         // The main auth guard has already run. We are definitely authenticated here.
@@ -215,22 +269,27 @@ const app = {
             }
         });
 
-        // Proceed with initializing the app UI and services.
+        // Initialize essential services first
         await db.init();
         logic.loadSettings();
         this.updateLanguage();
         this.bind();
-        await this.loadScans();
-        this.registerSW();
 
+        // Set user info
         const userDisplay = document.getElementById("user-display-name");
         const avatar = document.getElementById("user-avatar-img");
         userDisplay.textContent = fbService.getUserDisplay();
         avatar.src = user.photoURL || `https://ui-avatars.com/api/?name=${userDisplay.textContent}&background=random`;
         
+        // Start camera and network services as early as possible
         this.startScanner();
         this.startAutoSync();
         this.updateConnectionStatus();
+
+        // Load local data in the background and then enable scan processing
+        await this.loadScans();
+        this.scansLoaded = true; // Now we can safely process new scans
+        this.registerSW();
     },
 
     bind() {
@@ -254,7 +313,14 @@ const app = {
         $("batch-layout").onchange = e => this.batchLayout = e.target.value;
         document.querySelectorAll(".input,.select").forEach(el => { el.onchange = () => logic.saveSettings(); el.onblur = () => logic.saveSettings() });
         $("ocr-toggle").onchange = () => logic.saveSettings();
-        $("theme-select").onchange = () => logic.saveSettings();
+        document.querySelectorAll(".theme-btn").forEach(btn => {
+            btn.onclick = () => {
+                document.querySelectorAll(".theme-btn").forEach(b => b.classList.remove("on"));
+                btn.classList.add("on");
+                logic.saveSettings();
+            };
+        });
+        $("dark-mode-toggle").onchange = () => logic.saveSettings();
         $("lang-select").onchange = () => {
             logic.saveSettings();
             this.updateLanguage();
@@ -327,7 +393,15 @@ const app = {
         // Si está online y con usuario de Firebase, el punto será verde por defecto (sin clases extra)
     },
     showBigAlert(title, code, type) { const el = document.getElementById("big-alert"); const box = document.getElementById("ba-box"); document.getElementById("ba-title").textContent = title; document.getElementById("ba-code").textContent = code; document.getElementById("ba-icon").textContent = type === "warning" ? "⚠️" : "ℹ️"; box.className = "ba-box " + type; el.classList.add("on"); if (navigator.vibrate) navigator.vibrate([100, 50, 100, 50, 200]); this.beep(200, 0.3) },
-    onScan(raw) { if (this.isHandling) return; const now = Date.now(); if (raw === this.lastCode && now - this.lastAt < 1200) return; this.lastCode = raw; this.lastAt = now; this.isHandling = true; const n = logic.normalize(raw); let finalCode = logic.convert(n, this.mode); if (!finalCode) finalCode = n; if (!logic.validate(finalCode, this.mode)) { this.status(`${logic.t("toast_invalid")} (${this.mode})`); this.feedback("error"); this.toast(`${logic.t("toast_invalid")} ${this.mode}`, "warning"); this.pauseScannerTemporarily(800).finally(() => { this.isHandling = false }); return } const dup = this.scans.find(s => s.code_normalized === finalCode); if (dup) { this.status(logic.t("toast_duplicate")); this.feedback("warning"); this.showBigAlert(logic.t("alert_duplicate"), finalCode, "warning"); this.pauseScannerTemporarily(2000).finally(() => { this.isHandling = false }); return } this.tempScan = finalCode; if (this.batchMode) { this.confirm(this.batchLayout).finally(async () => { this.batchCount++; this.updateMetrics(); this.status(`${logic.t("toast_saved")}: ${finalCode}`); this.feedback("success"); await this.pauseScannerTemporarily(); this.isHandling = false }); return } this.confirm("QWERTY").finally(async () => { this.status(`${logic.t("toast_saved")}: ${finalCode}`); this.feedback("success"); await this.pauseScannerTemporarily(); this.isHandling = false }) },
+    onScan(raw) {
+        if (this.isHandling) return;
+        // Add a guard to prevent processing scans before local history is loaded
+        if (!this.scansLoaded) {
+            this.status(logic.t("status_loading_hist"));
+            this.beep(440, .05);
+            return;
+        }
+        const now = Date.now(); if (raw === this.lastCode && now - this.lastAt < 1200) return; this.lastCode = raw; this.lastAt = now; this.isHandling = true; const n = logic.normalize(raw); let finalCode = logic.convert(n, this.mode); if (!finalCode) finalCode = n; if (!logic.validate(finalCode, this.mode)) { this.status(`${logic.t("toast_invalid")} (${this.mode})`); this.feedback("error"); this.toast(`${logic.t("toast_invalid")} ${this.mode}`, "warning"); this.pauseScannerTemporarily(800).finally(() => { this.isHandling = false }); return } const dup = this.scans.find(s => s.code_normalized === finalCode); if (dup) { this.status(logic.t("toast_duplicate")); this.feedback("warning"); this.showBigAlert(logic.t("alert_duplicate"), finalCode, "warning"); this.pauseScannerTemporarily(2000).finally(() => { this.isHandling = false }); return } this.tempScan = finalCode; if (this.batchMode) { this.confirm(this.batchLayout).finally(async () => { this.batchCount++; this.updateMetrics(); this.status(`${logic.t("toast_saved")}: ${finalCode}`); this.feedback("success"); await this.pauseScannerTemporarily(); this.isHandling = false }); return } this.confirm("QWERTY").finally(async () => { this.status(`${logic.t("toast_saved")}: ${finalCode}`); this.feedback("success"); await this.pauseScannerTemporarily(); this.isHandling = false }) },
     async confirm(layout) { const r = { code_original: this.tempScan, code_normalized: this.tempScan, pi_mode: this.mode, layout, date: new Date().toISOString(), used: false, dateUsed: null, status: "pending" }; await db.addScan(r); await this.loadScans(); this.toast(`${logic.t("toast_saved")} ${this.tempScan}`, "success") },
 
     // --- SYNC LOGIC UPDATED FOR FIREBASE ---

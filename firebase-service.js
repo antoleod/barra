@@ -39,6 +39,11 @@ async function tryGetJson(url) {
 }
 
 async function loadFirebaseConfig() {
+    // Skip fetching init.json on typical Live Server ports to avoid 404 console errors
+    if (window.location.hostname === "127.0.0.1" || window.location.hostname === "localhost") {
+        if (window.location.port === "5500" || window.location.port === "8080") return null;
+    }
+
     const hostingConfig = await tryGetJson("/__/firebase/init.json");
     if (hostingConfig) return hostingConfig;
 
