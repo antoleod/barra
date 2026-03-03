@@ -359,7 +359,11 @@ const app = {
     status(text) { document.getElementById("live").textContent = text },
     updateMetrics() { const p = this.scans.filter(s => s.status === "pending").length; document.getElementById("m-total").textContent = `${this.scans.length} ${logic.t("recs")}`; document.getElementById("m-pending").textContent = `${p} ${logic.t("pend")}`; document.getElementById("m-batch").textContent = this.batchMode ? `Batch ${this.batchCount}` : logic.t("batch_off") },
     show(id) { this.close(false); const p = document.getElementById(id); p.classList.add("on"); p.setAttribute("aria-hidden", "false"); document.getElementById("backdrop").classList.add("on") },
-    close(reset = true) { document.querySelectorAll(".panel.on").forEach(p => { p.classList.remove("on"); p.setAttribute("aria-hidden", "true") }); document.getElementById("backdrop").classList.remove("on"); if (reset) this.setNav("") },
+    close(reset = true) {
+        // Quitar el foco de elementos dentro del panel para evitar error 'aria-hidden'
+        if (document.activeElement && document.activeElement.closest('.panel.on')) { document.activeElement.blur(); }
+        document.querySelectorAll(".panel.on").forEach(p => { p.classList.remove("on"); p.setAttribute("aria-hidden", "true") }); document.getElementById("backdrop").classList.remove("on"); if (reset) this.setNav("")
+    },
     toggleBatch() { this.batchMode = document.getElementById("batch-toggle").checked; document.getElementById("batch-layout").disabled = !this.batchMode; if (!this.batchMode) this.batchCount = 0; this.updateMetrics() },
     setMode(m) { this.mode = m; document.getElementById("mode-full").classList.toggle("on", m === "FULL"); document.getElementById("mode-short").classList.toggle("on", m === "SHORT"); document.getElementById("mode-tag").textContent = `${m} MODE`; this.status(`${m} mode active`) },
     toast(msg, type = "info", dur = 2200) { const c = document.getElementById("toast"), t = document.createElement("div"), ic = type === "success" ? "✓" : type === "warning" ? "!" : type === "error" ? "✕" : "•"; t.className = `t ${type}`; t.innerHTML = `<span>${ic}</span><span>${msg}</span>`; c.appendChild(t); requestAnimationFrame(() => t.classList.add("show")); setTimeout(() => { t.classList.remove("show"); t.addEventListener("transitionend", () => t.remove(), { once: true }) }, dur) },
@@ -527,7 +531,17 @@ const app = {
         this.confirmCallback = null;
     },
     async stopScanner() { if (!this.scanner || this.scannerState !== "scanning") return; try { await this.scanner.stop(); this.scannerState = "stopped" } catch (_) { this.scannerState = "stopped" } },
-    async startScanner() { if (!fbService.currentUser) return; if (this.restartTimer) { clearTimeout(this.restartTimer); this.restartTimer = null } if (this.scannerState === "scanning") return; if (!this.scanner) this.scanner = new Html5Qrcode("reader", { verbose: false }); const cfg = { fps: 10, aspectRatio: 1.7777778 }; this.status(logic.t("status_start_cam")); try { await this.scanner.start({ facingMode: { exact: "environment" } }, cfg, d => this.onScan(d), () => { }); this.scannerState = "scanning"; this.status(logic.t("status_ready")); return } catch (_) { } try { await this.scanner.start({ facingMode: "environment" }, cfg, d => this.onScan(d), () => { }); this.scannerState = "scanning"; this.status(logic.t("status_ready")); return } catch (_) { } try { const cams = await Html5Qrcode.getCameras(); if (!cams?.length) throw new Error("No cameras"); const back = cams.find(c => { const l = String(c.label || "").toLowerCase(); return l.includes("back") || l.includes("rear") || l.includes("trase") || l.includes("environment") }); await this.scanner.start((back || cams[0]).id, cfg, d => this.onScan(d), () => { }); this.scannerState = "scanning"; this.status(logic.t("status_ready")) } catch (err) { this.scannerState = "error"; this.status(logic.t("status_error_cam")); this.toast(logic.t("status_error_cam"), "error", 3000); console.error(err) } }
+    async startScanner() { if (!fbService.currentUser) return; if (this.restartTimer) { clearTimeout(this.restartTimer); this.restartTimer = null } if (this.scannerState === "scanning") return; if (!this.scanner) this.scanner = new Html5Qrcode("reader", { verbose: false }); const cfg = { fps: 10, aspectRatio: 1.7777778 }; this.status(logic.t("status_start_cam")); try { await this.scanner.start({ facingMode: { exact: "environment" } }, cfg, d => this.onScan(d), () => { }); this.scannerState = "scanning"; this.status(logic.t("status_ready")); return } catch (_) { } try { await this.scanner.start({ facingMode: "environment" }, cfg, d => this.onScan(d), () => { }); this.scannerState = "scanning"; this.status(logic.t("status_ready")); return } catch (_) { } try { const cams = await Html5Qrcode.getCameras(); if (!cams?.length) throw new Error("No cameras"); const back = cams.find(c => { const l = String(c.label || "").toLowerCase(); return l.includes("back") || l.includes("rear") || l.includes("trase") || l.includes("environment") }); await this.scanner.start((back || cams[0]).id, cfg, d => this.onScan(d), () => { }); this.scannerState = "scanning"; this.status(logic.t("status_ready")) } catch (err) { 
+        this.scannerState = "error"; 
+        if (err.name === "NotAllowedError" || err.name === "PermissionDeniedError") {
+            this.status("Camera permission denied");
+            this.toast("Please enable camera permissions", "error", 4000);
+        } else {
+            this.status(logic.t("status_error_cam")); 
+            this.toast(logic.t("status_error_cam"), "error", 3000); 
+        }
+        console.error(err) 
+    } }
 };
 
 /**
