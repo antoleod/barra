@@ -41,7 +41,11 @@ self.addEventListener("fetch", (event) => {
           return res;
         })
         .catch(() => {
-          if (event.request.mode === "navigate") return caches.match("./index.html");
+          if (event.request.mode === "navigate") {
+            const url = new URL(event.request.url);
+            const fallback = url.pathname.includes("login") ? "./login.html" : "./index.html";
+            return caches.match(fallback);
+          }
           return undefined;
         })
     )
