@@ -51,9 +51,89 @@ const db = {
     }
 };
 
+// --- I18N MODULE ---
+const i18n = {
+    en: {
+        loading: "LOADING",
+        status_ready: "Ready to scan",
+        status_connecting: "Connecting to Firebase...",
+        status_no_internet: "No internet connection",
+        status_error_config: "Error: Firebase not configured.",
+        status_start_cam: "Starting camera",
+        status_stop_cam: "Camera stopped",
+        status_error_cam: "Could not open camera",
+        nav_history: "History", nav_image: "Image", nav_nfc: "NFC", nav_sync: "Sync", nav_settings: "Settings",
+        header_history: "History", header_settings: "Settings",
+        lbl_language: "Language", lbl_scan_mode: "Scan Mode", lbl_batch: "Batch", lbl_batch_enable: "Enable batch scanning",
+        lbl_validation: "Validation", lbl_ocr: "OCR correction (O to 0)", lbl_theme: "Visual Theme", lbl_local_data: "Local Data",
+        lbl_connected_as: "CONNECTED AS",
+        btn_logout: "Logout", btn_export: "Export CSV", btn_clear_hist: "Clear local history", btn_clear_cache: "Clear Cache and Reload",
+        tab_all: "All", tab_pending: "Pending", tab_sent: "Sent",
+        ph_search: "Search code", ph_recent: "Recent records...", ph_full_prefix: "Full prefix", ph_short_prefix: "Short prefix",
+        msg_no_records: "No records to show.", msg_click_mark: "Mark used", msg_marked: "USED",
+        modal_clear_hist_title: "Clear History", modal_clear_hist_msg: "This action is irreversible and will delete all records saved on this device. Are you sure?", modal_clear_hist_btn: "Yes, clear",
+        modal_clear_cache_title: "Clear Cache", modal_clear_cache_msg: "This will force a reload of all application files. Useful if the app is not working correctly. Continue?", modal_clear_cache_btn: "Yes, clear",
+        toast_saved: "Saved", toast_duplicate: "Duplicate code", toast_invalid: "Invalid format", toast_syncing: "Syncing...", toast_sync_ok: "Sync complete", toast_sync_err: "Sync error", toast_history_cleared: "History cleared", toast_cache_cleared: "Cleanup complete. Reloading...",
+        alert_duplicate: "DUPLICATE", btn_close: "CLOSE", btn_cancel: "Cancel", btn_confirm: "Confirm",
+        recs: "records", pend: "pending", batch_off: "Batch off"
+    },
+    es: {
+        loading: "CARGANDO",
+        status_ready: "Listo para escanear",
+        status_connecting: "Conectando a Firebase...",
+        status_no_internet: "Sin conexión a internet",
+        status_error_config: "Error: Firebase no configurado.",
+        status_start_cam: "Iniciando cámara",
+        status_stop_cam: "Cámara detenida",
+        status_error_cam: "No se pudo abrir la cámara",
+        nav_history: "Historial", nav_image: "Imagen", nav_nfc: "NFC", nav_sync: "Sync", nav_settings: "Ajustes",
+        header_history: "Historial", header_settings: "Ajustes",
+        lbl_language: "Idioma", lbl_scan_mode: "Modo de Escaneo", lbl_batch: "Lote (Batch)", lbl_batch_enable: "Activar escaneo por lote",
+        lbl_validation: "Validación", lbl_ocr: "Corrección OCR (O a 0)", lbl_theme: "Tema Visual", lbl_local_data: "Datos Locales",
+        lbl_connected_as: "CONECTADO COMO",
+        btn_logout: "Cerrar Sesión", btn_export: "Exportar CSV", btn_clear_hist: "Borrar historial local", btn_clear_cache: "Limpiar Caché y Recargar",
+        tab_all: "Todo", tab_pending: "Pendientes", tab_sent: "Enviados",
+        ph_search: "Buscar código", ph_recent: "Registros recientes...", ph_full_prefix: "Prefijo Full", ph_short_prefix: "Prefijo Short",
+        msg_no_records: "No hay registros.", msg_click_mark: "Marcar usado", msg_marked: "USADO",
+        modal_clear_hist_title: "Borrar Historial", modal_clear_hist_msg: "Esta acción es irreversible y borrará todos los registros. ¿Estás seguro?", modal_clear_hist_btn: "Sí, borrar",
+        modal_clear_cache_title: "Limpiar Caché", modal_clear_cache_msg: "Esto recargará la aplicación. ¿Continuar?", modal_clear_cache_btn: "Sí, limpiar",
+        toast_saved: "Guardado", toast_duplicate: "Código duplicado", toast_invalid: "Formato inválido", toast_syncing: "Sincronizando...", toast_sync_ok: "Sincronización completa", toast_sync_err: "Error de sincronización", toast_history_cleared: "Historial borrado", toast_cache_cleared: "Limpieza completa. Recargando...",
+        alert_duplicate: "DUPLICADO", btn_close: "CERRAR", btn_cancel: "Cancelar", btn_confirm: "Confirmar",
+        recs: "registros", pend: "pendientes", batch_off: "Batch off"
+    },
+    fr: {
+        loading: "CHARGEMENT",
+        status_ready: "Prêt à scanner",
+        status_connecting: "Connexion à Firebase...",
+        status_no_internet: "Pas de connexion internet",
+        status_error_config: "Erreur: Firebase non configuré.",
+        status_start_cam: "Démarrage caméra",
+        status_stop_cam: "Caméra arrêtée",
+        status_error_cam: "Impossible d'ouvrir la caméra",
+        nav_history: "Historique", nav_image: "Image", nav_nfc: "NFC", nav_sync: "Sync", nav_settings: "Paramètres",
+        header_history: "Historique", header_settings: "Paramètres",
+        lbl_language: "Langue", lbl_scan_mode: "Mode de Scan", lbl_batch: "Lot (Batch)", lbl_batch_enable: "Activer scan par lot",
+        lbl_validation: "Validation", lbl_ocr: "Correction OCR (O vers 0)", lbl_theme: "Thème Visuel", lbl_local_data: "Données Locales",
+        lbl_connected_as: "CONNECTÉ EN TANT QUE",
+        btn_logout: "Déconnexion", btn_export: "Exporter CSV", btn_clear_hist: "Effacer historique local", btn_clear_cache: "Vider cache et recharger",
+        tab_all: "Tous", tab_pending: "En attente", tab_sent: "Envoyés",
+        ph_search: "Chercher code", ph_recent: "Enregistrements récents...", ph_full_prefix: "Préfixe Full", ph_short_prefix: "Préfixe Short",
+        msg_no_records: "Aucun enregistrement.", msg_click_mark: "Marquer utilisé", msg_marked: "UTILISÉ",
+        modal_clear_hist_title: "Effacer Historique", modal_clear_hist_msg: "Cette action est irréversible. Êtes-vous sûr ?", modal_clear_hist_btn: "Oui, effacer",
+        modal_clear_cache_title: "Vider Cache", modal_clear_cache_msg: "Cela rechargera l'application. Continuer ?", modal_clear_cache_btn: "Oui, vider",
+        toast_saved: "Enregistré", toast_duplicate: "Code dupliqué", toast_invalid: "Format invalide", toast_syncing: "Synchronisation...", toast_sync_ok: "Sync terminée", toast_sync_err: "Erreur sync", toast_history_cleared: "Historique effacé", toast_cache_cleared: "Nettoyage terminé. Rechargement...",
+        alert_duplicate: "DUPLIQUÉ", btn_close: "FERMER", btn_cancel: "Annuler", btn_confirm: "Confirmer",
+        recs: "enregistrements", pend: "en attente", batch_off: "Batch off"
+    }
+};
+
 // --- LOGIC MODULE ---
 const logic = {
-    settings: { fullPrefix: "02PI20", shortPrefix: "MUSTBRUN", ocrCorrection: true, scriptUrl: "", theme: "midnight" }, // scriptUrl deprecated but kept for compatibility
+    settings: { fullPrefix: "02PI20", shortPrefix: "MUSTBRUN", ocrCorrection: true, scriptUrl: "", theme: "midnight", lang: "en" },
+    t(key) {
+        const l = this.settings.lang || "en";
+        return (i18n[l] && i18n[l][key]) || i18n["en"][key] || key;
+    },
     applyTheme(theme) {
         const validThemes = new Set(["midnight", "sunset", "forest", "ice"]);
         const selected = validThemes.has(theme) ? theme : "midnight";
@@ -77,6 +157,8 @@ const logic = {
         document.getElementById("ocr-toggle").checked = this.settings.ocrCorrection;
         const themeSelect = document.getElementById("theme-select");
         if (themeSelect) themeSelect.value = this.settings.theme || "midnight";
+        const langSelect = document.getElementById("lang-select");
+        if (langSelect) langSelect.value = this.settings.lang || "en";
         this.applyTheme(this.settings.theme);
     },
     saveSettings() {
@@ -85,6 +167,8 @@ const logic = {
         this.settings.ocrCorrection = document.getElementById("ocr-toggle").checked;
         const themeSelect = document.getElementById("theme-select");
         if (themeSelect) this.settings.theme = themeSelect.value;
+        const langSelect = document.getElementById("lang-select");
+        if (langSelect) this.settings.lang = langSelect.value;
         this.applyTheme(this.settings.theme);
         localStorage.setItem("barra_settings", JSON.stringify(this.settings))
     },
@@ -134,6 +218,7 @@ const app = {
         // Proceed with initializing the app UI and services.
         await db.init();
         logic.loadSettings();
+        this.updateLanguage();
         this.bind();
         await this.loadScans();
         this.registerSW();
@@ -170,6 +255,10 @@ const app = {
         document.querySelectorAll(".input,.select").forEach(el => { el.onchange = () => logic.saveSettings(); el.onblur = () => logic.saveSettings() });
         $("ocr-toggle").onchange = () => logic.saveSettings();
         $("theme-select").onchange = () => logic.saveSettings();
+        $("lang-select").onchange = () => {
+            logic.saveSettings();
+            this.updateLanguage();
+        };
         $("export-btn").onclick = () => this.exportCSV();
         $("clear-btn").onclick = () => this.clearDB();
         $("clear-cache-btn").onclick = () => this.clearCacheAndReload();
@@ -190,10 +279,19 @@ const app = {
         window.addEventListener("online", () => { this.updateConnectionStatus(); this.startAutoSync() });
         window.addEventListener("offline", () => { this.updateConnectionStatus(); this.stopAutoSync() })
     },
+    updateLanguage() {
+        document.querySelectorAll("[data-i18n]").forEach(el => {
+            el.textContent = logic.t(el.dataset.i18n);
+        });
+        document.querySelectorAll("[data-i18n-ph]").forEach(el => {
+            el.placeholder = logic.t(el.dataset.i18nPh);
+        });
+        this.updateMetrics();
+    },
     registerSW() { if ("serviceWorker" in navigator) { navigator.serviceWorker.register("./sw.js").catch(() => { }) } },
     setNav(id) { document.querySelectorAll("#nav .n").forEach(b => b.classList.toggle("on", b.id === id)); if (id === "n-image") setTimeout(() => document.querySelectorAll("#nav .n").forEach(b => b.classList.remove("on")), 500) },
     status(text) { document.getElementById("live").textContent = text },
-    updateMetrics() { const p = this.scans.filter(s => s.status === "pending").length; document.getElementById("m-total").textContent = `${this.scans.length} records`; document.getElementById("m-pending").textContent = `${p} pending`; document.getElementById("m-batch").textContent = this.batchMode ? `Batch ${this.batchCount}` : "Batch off" },
+    updateMetrics() { const p = this.scans.filter(s => s.status === "pending").length; document.getElementById("m-total").textContent = `${this.scans.length} ${logic.t("recs")}`; document.getElementById("m-pending").textContent = `${p} ${logic.t("pend")}`; document.getElementById("m-batch").textContent = this.batchMode ? `Batch ${this.batchCount}` : logic.t("batch_off") },
     show(id) { this.close(false); const p = document.getElementById(id); p.classList.add("on"); p.setAttribute("aria-hidden", "false"); document.getElementById("backdrop").classList.add("on") },
     close(reset = true) { document.querySelectorAll(".panel.on").forEach(p => { p.classList.remove("on"); p.setAttribute("aria-hidden", "true") }); document.getElementById("backdrop").classList.remove("on"); if (reset) this.setNav("") },
     toggleBatch() { this.batchMode = document.getElementById("batch-toggle").checked; document.getElementById("batch-layout").disabled = !this.batchMode; if (!this.batchMode) this.batchCount = 0; this.updateMetrics() },
@@ -203,9 +301,9 @@ const app = {
     beep(freq, dur, type = "sine", vol = 0.02) { try { const a = new (window.AudioContext || window.webkitAudioContext)(), o = a.createOscillator(), g = a.createGain(); o.type = type; o.frequency.value = freq; g.gain.value = vol; o.connect(g); g.connect(a.destination); o.start(); setTimeout(() => { o.stop(); a.close() }, dur * 1000) } catch (_) { } },
     async pauseScannerTemporarily(ms = this.pauseMs) { if (this.restartTimer) { clearTimeout(this.restartTimer); this.restartTimer = null } await this.stopScanner(); this.restartTimer = setTimeout(() => { this.startScanner() }, ms) },
     async loadScans() { this.scans = await db.getAll(); this.renderList(document.getElementById("search")?.value || ""); this.updateMetrics(); this.updateRecentScansFooter() },
-    updateRecentScansFooter() { const c = document.getElementById("recent-scans-container"); if (!c) return; const r = this.scans.slice().sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 8); c.innerHTML = ""; if (r.length === 0) { c.innerHTML = '<span class="recent-placeholder">Recent records...</span>'; return } r.forEach(s => { const e = document.createElement("span"); e.className = "recent-item"; e.textContent = s.code_normalized; c.appendChild(e) }) },
-    renderList(term = "") { const list = document.getElementById("log"); list.innerHTML = ""; const f = this.scans.filter(s => this.filter === "pending" ? s.status === "pending" : this.filter === "sent" ? s.status === "sent" : true).filter(s => (s.code_normalized || "").toLowerCase().includes(term.toLowerCase())).sort((a, b) => new Date(b.date) - new Date(a.date)); if (!f.length) { const d = document.createElement("div"); d.className = "item"; d.textContent = "No records to show."; list.appendChild(d); return } f.forEach(scan => { const li = document.createElement("li"); li.className = "item"; const dt = new Date(scan.date).toLocaleString([], { year: "2-digit", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" }); li.innerHTML = `<div class="ih"><div class="code">${scan.code_normalized}</div><div class="time">${dt}</div></div><div class="meta"><span class="badge badge-${String(scan.pi_mode || "SHORT").toLowerCase()}">${scan.pi_mode || "UNK"}</span><span class="badge badge-${scan.status}">${scan.status}</span>${scan.used ? '<span class="badge badge-used">USED</span>' : ''}</div><div style="display:flex;justify-content:flex-end">${!scan.used ? `<button class="btn" data-used="${scan.id}">Mark used</button>` : ""}</div>`; list.appendChild(li) }); list.querySelectorAll("[data-used]").forEach(b => b.onclick = async e => { e.stopPropagation(); await this.markUsed(Number(b.dataset.used)) }) },
-    async markUsed(id) { await db.markUsed(id); await this.loadScans(); this.toast("Marked as used") },
+    updateRecentScansFooter() { const c = document.getElementById("recent-scans-container"); if (!c) return; const r = this.scans.slice().sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 8); c.innerHTML = ""; if (r.length === 0) { c.innerHTML = `<span class="recent-placeholder" data-i18n="ph_recent">${logic.t("ph_recent")}</span>`; return } r.forEach(s => { const e = document.createElement("span"); e.className = "recent-item"; e.textContent = s.code_normalized; c.appendChild(e) }) },
+    renderList(term = "") { const list = document.getElementById("log"); list.innerHTML = ""; const f = this.scans.filter(s => this.filter === "pending" ? s.status === "pending" : this.filter === "sent" ? s.status === "sent" : true).filter(s => (s.code_normalized || "").toLowerCase().includes(term.toLowerCase())).sort((a, b) => new Date(b.date) - new Date(a.date)); if (!f.length) { const d = document.createElement("div"); d.className = "item"; d.textContent = logic.t("msg_no_records"); list.appendChild(d); return } f.forEach(scan => { const li = document.createElement("li"); li.className = "item"; const dt = new Date(scan.date).toLocaleString([], { year: "2-digit", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" }); li.innerHTML = `<div class="ih"><div class="code">${scan.code_normalized}</div><div class="time">${dt}</div></div><div class="meta"><span class="badge badge-${String(scan.pi_mode || "SHORT").toLowerCase()}">${scan.pi_mode || "UNK"}</span><span class="badge badge-${scan.status}">${scan.status}</span>${scan.used ? `<span class="badge badge-used">${logic.t("msg_marked")}</span>` : ''}</div><div style="display:flex;justify-content:flex-end">${!scan.used ? `<button class="btn" data-used="${scan.id}">${logic.t("msg_click_mark")}</button>` : ""}</div>`; list.appendChild(li) }); list.querySelectorAll("[data-used]").forEach(b => b.onclick = async e => { e.stopPropagation(); await this.markUsed(Number(b.dataset.used)) }) },
+    async markUsed(id) { await db.markUsed(id); await this.loadScans(); this.toast(logic.t("toast_saved")) },
     filterList(type) { this.filter = type; document.querySelectorAll(".tab").forEach(t => t.classList.toggle("on", t.dataset.filter === type)); this.renderList(document.getElementById("search").value || "") },
     updateConnectionStatus() {
         const dot = document.getElementById("dot");
@@ -217,20 +315,20 @@ const app = {
 
         if (!isOnline) {
             dot.classList.add("offline"); // Rojo si no hay internet
-            this.status("No internet connection");
+            this.status(logic.t("status_no_internet"));
         } else if (!fbService.enabled || !fbService.currentUser) {
             dot.classList.add("warning"); // Amarillo si hay internet pero no Firebase
             if (!fbService.enabled) {
-                this.status("Error: Firebase not configured.");
+                this.status(logic.t("status_error_config"));
             } else {
-                this.status("Connecting to Firebase...");
+                this.status(logic.t("status_connecting"));
             }
         }
         // Si está online y con usuario de Firebase, el punto será verde por defecto (sin clases extra)
     },
     showBigAlert(title, code, type) { const el = document.getElementById("big-alert"); const box = document.getElementById("ba-box"); document.getElementById("ba-title").textContent = title; document.getElementById("ba-code").textContent = code; document.getElementById("ba-icon").textContent = type === "warning" ? "⚠️" : "ℹ️"; box.className = "ba-box " + type; el.classList.add("on"); if (navigator.vibrate) navigator.vibrate([100, 50, 100, 50, 200]); this.beep(200, 0.3) },
-    onScan(raw) { if (this.isHandling) return; const now = Date.now(); if (raw === this.lastCode && now - this.lastAt < 1200) return; this.lastCode = raw; this.lastAt = now; this.isHandling = true; const n = logic.normalize(raw); let finalCode = logic.convert(n, this.mode); if (!finalCode) finalCode = n; if (!logic.validate(finalCode, this.mode)) { this.status(`Invalid code (${this.mode})`); this.feedback("error"); this.toast(`Invalid format for ${this.mode}`, "warning"); this.pauseScannerTemporarily(800).finally(() => { this.isHandling = false }); return } const dup = this.scans.find(s => s.code_normalized === finalCode); if (dup) { this.status("Duplicate code"); this.feedback("warning"); this.showBigAlert("DUPLICATE", finalCode, "warning"); this.pauseScannerTemporarily(2000).finally(() => { this.isHandling = false }); return } this.tempScan = finalCode; if (this.batchMode) { this.confirm(this.batchLayout).finally(async () => { this.batchCount++; this.updateMetrics(); this.status(`Saved in batch: ${finalCode}`); this.feedback("success"); await this.pauseScannerTemporarily(); this.isHandling = false }); return } this.confirm("QWERTY").finally(async () => { this.status(`Saved: ${finalCode}`); this.feedback("success"); await this.pauseScannerTemporarily(); this.isHandling = false }) },
-    async confirm(layout) { const r = { code_original: this.tempScan, code_normalized: this.tempScan, pi_mode: this.mode, layout, date: new Date().toISOString(), used: false, dateUsed: null, status: "pending" }; await db.addScan(r); await this.loadScans(); this.toast(`Saved ${this.tempScan}`, "success") },
+    onScan(raw) { if (this.isHandling) return; const now = Date.now(); if (raw === this.lastCode && now - this.lastAt < 1200) return; this.lastCode = raw; this.lastAt = now; this.isHandling = true; const n = logic.normalize(raw); let finalCode = logic.convert(n, this.mode); if (!finalCode) finalCode = n; if (!logic.validate(finalCode, this.mode)) { this.status(`${logic.t("toast_invalid")} (${this.mode})`); this.feedback("error"); this.toast(`${logic.t("toast_invalid")} ${this.mode}`, "warning"); this.pauseScannerTemporarily(800).finally(() => { this.isHandling = false }); return } const dup = this.scans.find(s => s.code_normalized === finalCode); if (dup) { this.status(logic.t("toast_duplicate")); this.feedback("warning"); this.showBigAlert(logic.t("alert_duplicate"), finalCode, "warning"); this.pauseScannerTemporarily(2000).finally(() => { this.isHandling = false }); return } this.tempScan = finalCode; if (this.batchMode) { this.confirm(this.batchLayout).finally(async () => { this.batchCount++; this.updateMetrics(); this.status(`${logic.t("toast_saved")}: ${finalCode}`); this.feedback("success"); await this.pauseScannerTemporarily(); this.isHandling = false }); return } this.confirm("QWERTY").finally(async () => { this.status(`${logic.t("toast_saved")}: ${finalCode}`); this.feedback("success"); await this.pauseScannerTemporarily(); this.isHandling = false }) },
+    async confirm(layout) { const r = { code_original: this.tempScan, code_normalized: this.tempScan, pi_mode: this.mode, layout, date: new Date().toISOString(), used: false, dateUsed: null, status: "pending" }; await db.addScan(r); await this.loadScans(); this.toast(`${logic.t("toast_saved")} ${this.tempScan}`, "success") },
 
     // --- SYNC LOGIC UPDATED FOR FIREBASE ---
     startAutoSync() { if (this.syncIntervalId || !navigator.onLine) return; this.syncIntervalId = setInterval(async () => { if (navigator.onLine) await this.runFullSync(true) }, 15000) },
@@ -244,8 +342,8 @@ const app = {
         b.disabled = true;
         a.classList.add('syncing');
         b.classList.add('syncing');
-        this.status("Syncing...");
-        if (!silent) this.toast("Syncing", "info", 1400);
+        this.status(logic.t("toast_syncing"));
+        if (!silent) this.toast(logic.t("toast_syncing"), "info", 1400);
 
         try {
             const pending = this.scans.filter(s => s.status === "pending");
@@ -261,12 +359,12 @@ const app = {
             // Merge de datos del servidor
             const merged = await this.merge(result.serverScans);
 
-            this.status(`Sync complete${merged ? ` (${merged} new)` : ""}`);
-            if (!silent) this.toast(`Sync ready${merged ? `: ${merged} new` : ""}`, "success");
+            this.status(`${logic.t("toast_sync_ok")}${merged ? ` (${merged} new)` : ""}`);
+            if (!silent) this.toast(`${logic.t("toast_sync_ok")}${merged ? `: ${merged} new` : ""}`, "success");
         } catch (e) {
             console.error(e);
-            this.status("Sync error");
-            if (!silent) this.toast(e.message || "Sync error", "error", 2800);
+            this.status(logic.t("toast_sync_err"));
+            if (!silent) this.toast(e.message || logic.t("toast_sync_err"), "error", 2800);
         } finally {
             a.disabled = false;
             b.disabled = false;
@@ -297,33 +395,33 @@ const app = {
         return add;
     },
 
-    async scanImage(event) { const file = event?.target?.files?.[0]; if (!file) return; this.toast("Scanning image", "info", 1500); try { await this.stopScanner(); const h = new Html5Qrcode("reader"); const decoded = await h.scanFile(file, true); this.onScan(decoded); await h.clear() } catch (_) { this.toast("No code detected in image", "warning", 2400) } finally { event.target.value = ""; await this.startScanner(); this.setNav("") } },
+    async scanImage(event) { const file = event?.target?.files?.[0]; if (!file) return; this.toast("Scanning image", "info", 1500); try { await this.stopScanner(); const h = new Html5Qrcode("reader"); const decoded = await h.scanFile(file, true); this.onScan(decoded); await h.clear() } catch (_) { this.toast("No code detected", "warning", 2400) } finally { event.target.value = ""; await this.startScanner(); this.setNav("") } },
     async startNFC() { if (!("NDEFReader" in window)) { this.toast("NFC not supported", "error"); return } try { const n = new NDEFReader(); await n.scan(); this.toast("Bring badge closer...", "info"); n.onreading = e => { if (e.message && e.message.records) { for (const r of e.message.records) { if (r.recordType === "text") { try { const l = r.data.getUint8(0) & 63; const t = new TextDecoder(r.encoding).decode(new DataView(r.data.buffer, r.data.byteOffset + 1 + l, r.data.byteLength - 1 - l)); this.onScan(t); return } catch (_) { } } } } if (e.serialNumber) this.onScan(e.serialNumber.replace(/:/g, "").toUpperCase()) }; n.onreadingerror = () => this.toast("NFC reading error", "error") } catch (e) { this.toast("NFC Error: " + e, "error") } },
     exportCSV() { const h = ["ID", "Code", "Mode", "Layout", "Date", "Status", "Used"], rows = this.scans.map(s => [s.id, s.code_normalized, s.pi_mode, s.layout, s.date, s.status, s.used]), csv = [h.join(","), ...rows.map(r => r.join(","))].join("\n"), blob = new Blob([csv], { type: "text/csv" }), url = URL.createObjectURL(blob), a = document.createElement("a"); a.href = url; a.download = `barra_export_${new Date().toISOString().slice(0, 10)}.csv`; a.click(); URL.revokeObjectURL(url); this.toast("CSV exported", "success") },
     async clearDB() {
         this.showConfirmation({
-            title: 'Clear History',
-            message: 'This action is irreversible and will delete all records saved on this device. Are you sure?',
+            title: logic.t("modal_clear_hist_title"),
+            message: logic.t("modal_clear_hist_msg"),
             icon: '🗑️',
-            confirmText: 'Yes, clear',
+            confirmText: logic.t("modal_clear_hist_btn"),
             onConfirm: async () => {
                 await db.clear();
                 this.batchCount = 0;
                 await this.loadScans();
-                this.toast("History cleared", "success");
+                this.toast(logic.t("toast_history_cleared"), "success");
                 this.hideConfirmation();
             }
         });
     },
     async clearCacheAndReload() {
         this.showConfirmation({
-            title: 'Clear Cache',
-            message: 'This will force a reload of all application files. Useful if the app is not working correctly. Continue?',
+            title: logic.t("modal_clear_cache_title"),
+            message: logic.t("modal_clear_cache_msg"),
             icon: '🧹',
-            confirmText: 'Yes, clear',
+            confirmText: logic.t("modal_clear_cache_btn"),
             onConfirm: async () => {
                 this.hideConfirmation();
-                this.toast("Clearing cache and Service Worker...", "info", 4000);
+                this.toast(logic.t("toast_cache_cleared"), "info", 4000);
                 try {
                     const registrations = await navigator.serviceWorker.getRegistrations();
                     for (const registration of registrations) {
@@ -332,7 +430,7 @@ const app = {
                     const cacheKeys = await caches.keys();
                     await Promise.all(cacheKeys.map(key => caches.delete(key)));
 
-                    this.toast("Cleanup complete. Reloading...", "success", 2000);
+                    this.toast(logic.t("toast_cache_cleared"), "success", 2000);
                     setTimeout(() => { window.location.reload(); }, 1500);
                 } catch (error) {
                     console.error("Error al limpiar la caché:", error);
@@ -355,7 +453,7 @@ const app = {
         this.confirmCallback = null;
     },
     async stopScanner() { if (!this.scanner || this.scannerState !== "scanning") return; try { await this.scanner.stop(); this.scannerState = "stopped" } catch (_) { this.scannerState = "stopped" } },
-    async startScanner() { if (!fbService.currentUser) return; if (this.restartTimer) { clearTimeout(this.restartTimer); this.restartTimer = null } if (this.scannerState === "scanning") return; if (!this.scanner) this.scanner = new Html5Qrcode("reader", { verbose: false }); const cfg = { fps: 10, aspectRatio: 1.7777778 }; this.status("Starting camera"); try { await this.scanner.start({ facingMode: { exact: "environment" } }, cfg, d => this.onScan(d), () => { }); this.scannerState = "scanning"; this.status("Ready to scan"); return } catch (_) { } try { await this.scanner.start({ facingMode: "environment" }, cfg, d => this.onScan(d), () => { }); this.scannerState = "scanning"; this.status("Ready to scan"); return } catch (_) { } try { const cams = await Html5Qrcode.getCameras(); if (!cams?.length) throw new Error("No cameras"); const back = cams.find(c => { const l = String(c.label || "").toLowerCase(); return l.includes("back") || l.includes("rear") || l.includes("trase") || l.includes("environment") }); await this.scanner.start((back || cams[0]).id, cfg, d => this.onScan(d), () => { }); this.scannerState = "scanning"; this.status("Ready to scan") } catch (err) { this.scannerState = "error"; this.status("Could not open camera"); this.toast("Could not start camera", "error", 3000); console.error(err) } }
+    async startScanner() { if (!fbService.currentUser) return; if (this.restartTimer) { clearTimeout(this.restartTimer); this.restartTimer = null } if (this.scannerState === "scanning") return; if (!this.scanner) this.scanner = new Html5Qrcode("reader", { verbose: false }); const cfg = { fps: 10, aspectRatio: 1.7777778 }; this.status(logic.t("status_start_cam")); try { await this.scanner.start({ facingMode: { exact: "environment" } }, cfg, d => this.onScan(d), () => { }); this.scannerState = "scanning"; this.status(logic.t("status_ready")); return } catch (_) { } try { await this.scanner.start({ facingMode: "environment" }, cfg, d => this.onScan(d), () => { }); this.scannerState = "scanning"; this.status(logic.t("status_ready")); return } catch (_) { } try { const cams = await Html5Qrcode.getCameras(); if (!cams?.length) throw new Error("No cameras"); const back = cams.find(c => { const l = String(c.label || "").toLowerCase(); return l.includes("back") || l.includes("rear") || l.includes("trase") || l.includes("environment") }); await this.scanner.start((back || cams[0]).id, cfg, d => this.onScan(d), () => { }); this.scannerState = "scanning"; this.status(logic.t("status_ready")) } catch (err) { this.scannerState = "error"; this.status(logic.t("status_error_cam")); this.toast(logic.t("status_error_cam"), "error", 3000); console.error(err) } }
 };
 
 /**

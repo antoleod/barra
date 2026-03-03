@@ -110,13 +110,30 @@ export const fbService = {
             if (!this.enabled) {
                 return resolve(null);
             }
+            
+            // Failsafe: If auth takes too long (e.g. offline/404), resolve null to unblock UI.
+            let resolved = false;
+            const timer = setTimeout(() => {
+                if (!resolved) {
+                    resolved = true;
+                    console.warn("[firebase-service] Auth check timed out, proceeding as guest/offline.");
+                    resolve(null);
+                }
+            }, 3000);
+
             // onAuthStateChanged fires immediately with the current state.
             // We only want the first result for our initial guard check.
             const unsubscribe = onAuthStateChanged(this.auth, user => {
+                if (resolved) return;
+                resolved = true;
+                clearTimeout(timer);
                 unsubscribe(); // Stop listening after the first result
                 this.currentUser = user;
                 resolve(user);
             }, err => {
+                if (resolved) return;
+                resolved = true;
+                clearTimeout(timer);
                 unsubscribe();
                 reject(err);
             });

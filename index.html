@@ -24,7 +24,7 @@
   <div id="app-loader" style="position:fixed;inset:0;background:var(--bg, #0d1117);z-index:9999;display:grid;place-items:center;transition:opacity 0.3s;">
     <div style="display:flex;flex-direction:column;align-items:center;gap:16px;color:var(--text, #e6edf3);font-family:sans-serif;">
       <div style="width:32px;height:32px;border:3px solid rgba(255,255,255,0.2);border-top-color:var(--accent, #58a6ff);border-radius:50%;animation:spin 0.8s linear infinite;"></div>
-      <div style="font-size:14px;font-weight:500;letter-spacing:0.5px;">LOADING</div>
+      <div style="font-size:14px;font-weight:500;letter-spacing:0.5px;" data-i18n="loading">LOADING</div>
     </div>
     <style>@keyframes spin{to{transform:rotate(360deg)}}</style>
   </div>
@@ -32,7 +32,7 @@
     <header class="app-header top">
       <div class="pill"><span id="dot" class="dot"></span><span>Barra Scanner</span></div>
       <script src="https://unpkg.com/html5-qrcode"></script>
-      <button class="icon-btn" id="sync-btn" aria-label="Sync"><span>⟳</span></button>
+      <button class="icon-btn" id="sync-btn" aria-label="Sync"><span data-i18n="icon_sync">⟳</span></button>
     </header>
 
     <main class="app-main">
@@ -46,24 +46,23 @@
       </section>
       <section class="status-wrap">
         <div class="status">
-          <div class="shead"><span id="mode-tag">FULL MODE</span><span id="offline"
+          <div class="shead"><span id="mode-tag">FULL MODE</span><span id="offline" data-i18n="status_no_internet"
               style="display:none;color:#ff9ca8;font-weight:700">NO CONNECTION</span></div>
-          <div id="live" class="live">Ready to scan</div>
-          <div class="metrics"><span class="m" id="m-total">0 records</span><span class="m" id="m-pending">0
-              pending</span><span class="m" id="m-batch">Batch off</span></div>
+          <div id="live" class="live" data-i18n="status_ready">Ready to scan</div>
+          <div class="metrics"><span class="m" id="m-total">0 records</span><span class="m" id="m-pending">0 pending</span><span class="m" id="m-batch">Batch off</span></div>
         </div>
       </section>
     </main>
 
     <footer class="app-footer">
       <div class="recent-scans-footer">
-        <div id="recent-scans-container"><span class="recent-placeholder">Recent records...</span></div>
+        <div id="recent-scans-container"><span class="recent-placeholder" data-i18n="ph_recent">Recent records...</span></div>
       </div>
-      <nav id="nav"><button class="n" id="n-history"><span>▦</span><span>History</span></button><button class="n"
-          id="n-image"><span>◩</span><span>Image</span></button><button class="n"
-          id="n-nfc"><span>📡</span><span>NFC</span></button><button class="n"
-          id="n-sync"><span>↻</span><span>Sync</span></button><button class="n"
-          id="n-settings"><span>⚙</span><span>Settings</span></button><input id="file" type="file" accept="image/*"
+      <nav id="nav"><button class="n" id="n-history"><span>▦</span><span data-i18n="nav_history">History</span></button><button class="n"
+          id="n-image"><span>◩</span><span data-i18n="nav_image">Image</span></button><button class="n"
+          id="n-nfc"><span>📡</span><span data-i18n="nav_nfc">NFC</span></button><button class="n"
+          id="n-sync"><span>↻</span><span data-i18n="nav_sync">Sync</span></button><button class="n"
+          id="n-settings"><span>⚙</span><span data-i18n="nav_settings">Settings</span></button><input id="file" type="file" accept="image/*"
           style="display:none" /></nav>
     </footer>
   </div>
@@ -72,9 +71,9 @@
   <div id="big-alert" class="big-alert">
     <div id="ba-box" class="ba-box">
       <span id="ba-icon" class="ba-icon">⚠️</span>
-      <div id="ba-title" class="ba-title">DUPLICATE</div>
+      <div id="ba-title" class="ba-title" data-i18n="alert_duplicate">DUPLICATE</div>
       <div id="ba-code" class="ba-code">...</div>
-      <button id="ba-btn" class="ba-btn">CLOSE</button>
+      <button id="ba-btn" class="ba-btn" data-i18n="btn_close">CLOSE</button>
     </div>
   </div>
   <div id="confirm-modal" class="big-alert">
@@ -83,41 +82,48 @@
       <div id="cm-title" class="ba-title"></div>
       <p id="cm-message" class="ba-message"></p>
       <div class="ba-actions">
-        <button id="cm-cancel-btn" class="btn">Cancel</button>
-        <button id="cm-confirm-btn" class="btn btn-danger">Confirm</button>
+        <button id="cm-cancel-btn" class="btn" data-i18n="btn_cancel">Cancel</button>
+        <button id="cm-confirm-btn" class="btn btn-danger" data-i18n="btn_confirm">Confirm</button>
       </div>
     </div>
   </div>
   <div id="backdrop" class="backdrop"></div>
   <section id="history" class="panel" aria-hidden="true">
     <header class="ph">
-      <div class="title">History</div><button class="icon-btn" data-close="history">✕</button>
+      <div class="title" data-i18n="header_history">History</div><button class="icon-btn" data-close="history">✕</button>
     </header>
-    <div class="pc"><input id="search" class="input" placeholder="Search code" />
-      <div class="tabs"><button class="tab on" data-filter="all">All</button><button class="tab"
-          data-filter="pending">Pending</button><button class="tab" data-filter="sent">Sent</button></div>
+    <div class="pc"><input id="search" class="input" placeholder="Search code" data-i18n-ph="ph_search" />
+      <div class="tabs"><button class="tab on" data-filter="all" data-i18n="tab_all">All</button><button class="tab"
+          data-filter="pending" data-i18n="tab_pending">Pending</button><button class="tab" data-filter="sent" data-i18n="tab_sent">Sent</button></div>
       <ul id="log"></ul>
     </div>
   </section>
   <section id="settings" class="panel" aria-hidden="true">
     <header class="ph">
-      <div class="title">Settings</div><button class="icon-btn" data-close="settings">✕</button>
+      <div class="title" data-i18n="header_settings">Settings</div><button class="icon-btn" data-close="settings">✕</button>
     </header>
     <div class="pc">
       <div class="user-info">
         <img id="user-avatar-img" class="user-avatar" src="" />
         <div style="flex:1">
-          <div style="font-size:10px;color:#888">CONNECTED AS</div>
+          <div style="font-size:10px;color:#888" data-i18n="lbl_connected_as">CONNECTED AS</div>
           <div id="user-display-name" class="user-name">...</div>
         </div>
-        <button id="logout-btn" class="btn btn-danger" style="padding:6px 12px;font-size:12px">Logout</button>
+        <button id="logout-btn" class="btn btn-danger" style="padding:6px 12px;font-size:12px" data-i18n="btn_logout">Logout</button>
       </div>
-      <div style="margin-bottom:14px"><label class="label">Scan Mode</label>
+      <div style="margin-bottom:14px"><label class="label" data-i18n="lbl_language">Language</label>
+        <select id="lang-select" class="select">
+          <option value="en">English</option>
+          <option value="es">Español</option>
+          <option value="fr">Français</option>
+        </select>
+      </div>
+      <div style="margin-bottom:14px"><label class="label" data-i18n="lbl_scan_mode">Scan Mode</label>
         <div class="seg"><button id="mode-full" class="mode on" type="button">FULL PI</button><button id="mode-short"
             class="mode" type="button">SHORT</button></div>
       </div>
-      <div style="margin-bottom:14px"><label class="label">Batch</label>
-        <div class="row"><span>Enable batch scanning</span><label class="sw"><input type="checkbox"
+      <div style="margin-bottom:14px"><label class="label" data-i18n="lbl_batch">Batch</label>
+        <div class="row"><span data-i18n="lbl_batch_enable">Enable batch scanning</span><label class="sw"><input type="checkbox"
               id="batch-toggle" /><span class="sl"></span></label></div><select id="batch-layout" class="select"
           disabled>
           <option value="QWERTY">QWERTY</option>
@@ -125,13 +131,13 @@
           <option value="QWERTZU">QWERTZU</option>
         </select>
       </div>
-      <div style="margin-bottom:14px"><label class="label">Validation</label>
-        <div class="row"><span>OCR correction (O to 0)</span><label class="sw"><input type="checkbox"
+      <div style="margin-bottom:14px"><label class="label" data-i18n="lbl_validation">Validation</label>
+        <div class="row"><span data-i18n="lbl_ocr">OCR correction (O to 0)</span><label class="sw"><input type="checkbox"
               id="ocr-toggle" /><span class="sl"></span></label></div><input id="full-prefix" class="input"
-          placeholder="Full prefix" /><input id="short-prefix" class="input" placeholder="Short prefix"
+          placeholder="Full prefix" data-i18n-ph="ph_full_prefix" /><input id="short-prefix" class="input" placeholder="Short prefix" data-i18n-ph="ph_short_prefix"
           style="margin-top:8px" />
       </div>
-      <div style="margin-bottom:14px"><label class="label">Visual Theme</label>
+      <div style="margin-bottom:14px"><label class="label" data-i18n="lbl_theme">Visual Theme</label>
         <select id="theme-select" class="select">
           <option value="midnight">Midnight Steel</option>
           <option value="sunset">Sunset Ember</option>
@@ -139,10 +145,10 @@
           <option value="ice">Ice Graphite</option>
         </select>
       </div>
-      <div><label class="label">Local Data</label><button id="export-btn" class="btn"
-          style="width:100%;margin-bottom:8px">Export CSV</button>
-        <button id="clear-btn" class="btn btn-danger" style="width:100%;margin-bottom:8px">Clear local history</button>
-        <button id="clear-cache-btn" class="btn btn-danger" style="width:100%">Clear Cache and Reload</button>
+      <div><label class="label" data-i18n="lbl_local_data">Local Data</label><button id="export-btn" class="btn"
+          style="width:100%;margin-bottom:8px" data-i18n="btn_export">Export CSV</button>
+        <button id="clear-btn" class="btn btn-danger" style="width:100%;margin-bottom:8px" data-i18n="btn_clear_hist">Clear local history</button>
+        <button id="clear-cache-btn" class="btn btn-danger" style="width:100%" data-i18n="btn_clear_cache">Clear Cache and Reload</button>
       </div>
     </div>
   </section>
