@@ -8,6 +8,12 @@
     <title>Login - Barra Scanner</title>
     <link rel="icon" href="icon.svg" type="image/svg+xml">
     <meta name="theme-color" content="#0b0d10" />
+    <script>
+        try {
+            const settings = JSON.parse(localStorage.getItem("barra_settings") || "{}");
+            if (settings.theme) document.documentElement.setAttribute("data-theme", settings.theme);
+        } catch (_) { }
+    </script>
     <link rel="manifest" href="manifest.webmanifest" />
     <link rel="stylesheet" href="styles.css" />
 </head>

@@ -53,18 +53,39 @@ const db = {
 
 // --- LOGIC MODULE ---
 const logic = {
-    settings: { fullPrefix: "02PI20", shortPrefix: "MUSTBRUN", ocrCorrection: true, scriptUrl: "" }, // scriptUrl deprecated but kept for compatibility
+    settings: { fullPrefix: "02PI20", shortPrefix: "MUSTBRUN", ocrCorrection: true, scriptUrl: "", theme: "midnight" }, // scriptUrl deprecated but kept for compatibility
+    applyTheme(theme) {
+        const validThemes = new Set(["midnight", "sunset", "forest", "ice"]);
+        const selected = validThemes.has(theme) ? theme : "midnight";
+        document.documentElement.setAttribute("data-theme", selected);
+        const themeMeta = document.querySelector('meta[name="theme-color"]');
+        if (themeMeta) {
+            const colorByTheme = {
+                midnight: "#0d1117",
+                sunset: "#1a1212",
+                forest: "#0d1712",
+                ice: "#10161f"
+            };
+            themeMeta.setAttribute("content", colorByTheme[selected] || colorByTheme.midnight);
+        }
+    },
     loadSettings() {
         const s = localStorage.getItem("barra_settings");
         if (s) this.settings = { ...this.settings, ...JSON.parse(s) };
         document.getElementById("full-prefix").value = this.settings.fullPrefix;
         document.getElementById("short-prefix").value = this.settings.shortPrefix;
         document.getElementById("ocr-toggle").checked = this.settings.ocrCorrection;
+        const themeSelect = document.getElementById("theme-select");
+        if (themeSelect) themeSelect.value = this.settings.theme || "midnight";
+        this.applyTheme(this.settings.theme);
     },
     saveSettings() {
         this.settings.fullPrefix = document.getElementById("full-prefix").value.trim();
         this.settings.shortPrefix = document.getElementById("short-prefix").value.trim();
         this.settings.ocrCorrection = document.getElementById("ocr-toggle").checked;
+        const themeSelect = document.getElementById("theme-select");
+        if (themeSelect) this.settings.theme = themeSelect.value;
+        this.applyTheme(this.settings.theme);
         localStorage.setItem("barra_settings", JSON.stringify(this.settings))
     },
     normalize(code) {
@@ -146,6 +167,7 @@ const app = {
         $("batch-layout").onchange = e => this.batchLayout = e.target.value;
         document.querySelectorAll(".input,.select").forEach(el => { el.onchange = () => logic.saveSettings(); el.onblur = () => logic.saveSettings() });
         $("ocr-toggle").onchange = () => logic.saveSettings();
+        $("theme-select").onchange = () => logic.saveSettings();
         $("export-btn").onclick = () => this.exportCSV();
         $("clear-btn").onclick = () => this.clearDB();
         $("logout-btn").onclick = () => fbService.logout();

@@ -10,6 +10,12 @@
   <meta name="theme-color" content="#0b0d10" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <script>
+    try {
+      const settings = JSON.parse(localStorage.getItem("barra_settings") || "{}");
+      if (settings.theme) document.documentElement.setAttribute("data-theme", settings.theme);
+    } catch (_) { }
+  </script>
   <link rel="manifest" href="manifest.webmanifest" />
   <link rel="stylesheet" href="styles.css" />
 </head>
@@ -117,6 +123,14 @@
               id="ocr-toggle" /><span class="sl"></span></label></div><input id="full-prefix" class="input"
           placeholder="Full prefix" /><input id="short-prefix" class="input" placeholder="Short prefix"
           style="margin-top:8px" />
+      </div>
+      <div style="margin-bottom:14px"><label class="label">Tema visual</label>
+        <select id="theme-select" class="select">
+          <option value="midnight">Midnight Steel</option>
+          <option value="sunset">Sunset Ember</option>
+          <option value="forest">Forest Neon</option>
+          <option value="ice">Ice Graphite</option>
+        </select>
       </div>
       <div><label class="label">Datos locales</label><button id="export-btn" class="btn"
           style="width:100%;margin-bottom:8px">Exportar CSV</button><button id="clear-btn" class="btn btn-danger"
