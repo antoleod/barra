@@ -552,7 +552,7 @@ const app = {
         this.confirmCallback = null;
     },
     async stopScanner() { if (!this.scanner || this.scannerState !== "scanning") return; try { await this.scanner.stop(); this.scannerState = "stopped" } catch (_) { this.scannerState = "stopped" } },
-    async startScanner() { if (!fbService.currentUser) return; if (this.restartTimer) { clearTimeout(this.restartTimer); this.restartTimer = null } if (this.scannerState === "scanning") return; if (!this.scanner) this.scanner = new Html5Qrcode("reader", { verbose: false }); const cfg = { fps: 10, aspectRatio: 1.7777778 }; this.status(logic.t("status_start_cam")); try { await this.scanner.start({ facingMode: { exact: "environment" } }, cfg, d => this.onScan(d), () => { }); this.scannerState = "scanning"; this.status(logic.t("status_ready")); return } catch (_) { } try { await this.scanner.start({ facingMode: "environment" }, cfg, d => this.onScan(d), () => { }); this.scannerState = "scanning"; this.status(logic.t("status_ready")); return } catch (_) { } try { const cams = await Html5Qrcode.getCameras(); if (!cams?.length) throw new Error("No cameras"); const back = cams.find(c => { const l = String(c.label || "").toLowerCase(); return l.includes("back") || l.includes("rear") || l.includes("trase") || l.includes("environment") }); await this.scanner.start((back || cams[0]).id, cfg, d => this.onScan(d), () => { }); this.scannerState = "scanning"; this.status(logic.t("status_ready")) } catch (err) { 
+    async startScanner() { if (this.restartTimer) { clearTimeout(this.restartTimer); this.restartTimer = null } if (this.scannerState === "scanning") return; if (!this.scanner) this.scanner = new Html5Qrcode("reader", { verbose: false }); const cfg = { fps: 10, aspectRatio: 1.7777778 }; this.status(logic.t("status_start_cam")); try { await this.scanner.start({ facingMode: { exact: "environment" } }, cfg, d => this.onScan(d), () => { }); this.scannerState = "scanning"; this.status(logic.t("status_ready")); return } catch (_) { } try { await this.scanner.start({ facingMode: "environment" }, cfg, d => this.onScan(d), () => { }); this.scannerState = "scanning"; this.status(logic.t("status_ready")); return } catch (_) { } try { const cams = await Html5Qrcode.getCameras(); if (!cams?.length) throw new Error("No cameras"); const back = cams.find(c => { const l = String(c.label || "").toLowerCase(); return l.includes("back") || l.includes("rear") || l.includes("trase") || l.includes("environment") }); await this.scanner.start((back || cams[0]).id, cfg, d => this.onScan(d), () => { }); this.scannerState = "scanning"; this.status(logic.t("status_ready")) } catch (err) { 
         this.scannerState = "error"; 
         if (err.name === "NotAllowedError" || err.name === "PermissionDeniedError") {
             this.status("Camera permission denied");
@@ -570,21 +570,21 @@ const app = {
  */
 async function main() {
     try {
-        // 1. Check Auth State (UI is hidden behind loader)
-        const user = await fbService.getInitialUser();
-
-        if (!user) {
-            // User is not authenticated. Redirect to the login page.
-            if (fbService.enabled) {
-                window.location.replace('./login.html');
-            } else {
-                // Handle case where Firebase is not configured/enabled.
-                document.body.innerHTML = `<div style="padding: 2em; text-align: center; color: white;"><h1>Configuration Error</h1><p>Firebase is not available. The application cannot continue.</p></div>`;
+        // 1. Try auth; if not available, continue in offline mode
+        let user = null;
+        if (fbService.enabled) {
+            try {
+                user = await fbService.getInitialUser();
+            } catch (_) {
+                user = null;
             }
-            return; // Stop execution for this page.
+            if (!user) {
+                // Allow offline usage instead of blocking with loader
+                console.warn("Continuing in offline mode (no Firebase user).");
+            }
         }
 
-        // 2. User is authenticated. Initialize App Logic.
+        // 2. Initialize App Logic (works offline too)
         await app.init(user);
 
         // 3. Reveal the App UI and remove Loader

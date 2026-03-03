@@ -1136,3 +1136,11 @@ body::after {
   font-size: 0.85rem;
   font-weight: 600;
 }
+@media (max-width: 640px) {
+  .app-main { padding: 12px; }
+  nav#nav { gap: 4px; }
+  nav#nav .n { flex: 1; min-width: 0; }
+  .panel .pc { padding: 12px; }
+  .camera-stage { aspect-ratio: 3/4; }
+}
+
