@@ -19,7 +19,20 @@ const CORE = [
 
 self.addEventListener("install", (event) => {
   self.skipWaiting();
-  event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(CORE)));
+  event.waitUntil(
+    caches.open(CACHE).then(async (cache) => {
+      await Promise.allSettled(
+        CORE.map(async (url) => {
+          try {
+            await cache.add(url);
+          } catch (error) {
+            // Keep SW install resilient in offline mode or non-Firebase local servers.
+            console.warn("[sw] cache add failed:", url, error);
+          }
+        })
+      );
+    })
+  );
 });
 
 self.addEventListener("activate", (event) => {
@@ -46,7 +59,9 @@ self.addEventListener("fetch", (event) => {
             const fallback = url.pathname.includes("login") ? "./login.html" : "./index.html";
             return caches.match(fallback);
           }
-          return undefined;
+          // For non-navigation requests, let the fetch fail.
+          // Returning undefined here causes a TypeError.
+          // By returning nothing, the promise from the catch rejects, and the browser handles the network error.
         })
     )
   );
