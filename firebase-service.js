@@ -40,13 +40,16 @@ async function tryGetJson(url) {
 
 async function loadFirebaseConfig() {
     // Skip fetching init.json on typical Live Server ports to avoid 404 console errors
+    let shouldFetchInit = true;
     if (window.location.hostname === "127.0.0.1" || window.location.hostname === "localhost") {
-        if (window.location.port === "5500" || window.location.port === "8080") return null;
+        if (window.location.port === "5500" || window.location.port === "8080") shouldFetchInit = false;
     }
-    if (window.location.hostname === "oryxen.tech") return null;
+    if (window.location.hostname === "oryxen.tech") shouldFetchInit = false;
 
-    const hostingConfig = await tryGetJson("/__/firebase/init.json");
-    if (hostingConfig) return hostingConfig;
+    if (shouldFetchInit) {
+        const hostingConfig = await tryGetJson("/__/firebase/init.json");
+        if (hostingConfig) return hostingConfig;
+    }
 
     // --- CONFIGURACIÓN MANUAL DE RESPALDO ---
     // Rellena esto con los datos de tu proyecto desde la consola de Firebase
