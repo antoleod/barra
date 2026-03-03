@@ -183,6 +183,7 @@ export const fbService = {
         const uid = this.currentUser.uid;
         const userScansRef = collection(runtime.db, "users", uid, "scans");
         let pushedCount = 0;
+        const errors = [];
 
         for (const scan of localPendingScans) {
             try {
@@ -199,7 +200,17 @@ export const fbService = {
                 pushedCount++;
             } catch (error) {
                 console.error("Error subiendo scan", scan, error);
+                errors.push({ scan, error });
             }
+        }
+
+        // Si todos los intentos de subida fallaron, es un error grave que hay que reportar.
+        if (errors.length > 0 && errors.length === localPendingScans.length) {
+            const firstErrorCode = errors[0].error.code;
+            if (firstErrorCode === 'permission-denied') {
+                throw new Error("Error de permisos. Revisa las reglas de seguridad de Firestore.");
+            }
+            throw new Error(`Falló la subida de ${errors.length} registros.`);
         }
 
         const q = query(userScansRef);

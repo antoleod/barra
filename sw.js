@@ -1,4 +1,4 @@
-﻿const CACHE = "barra-scanner-v9-secure-config";
+﻿const CACHE = "barra-scanner-v11-force-refresh";
 const CORE = [
   "./",
   "./index.html",

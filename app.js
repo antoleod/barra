@@ -176,6 +176,7 @@ const app = {
         $("theme-select").onchange = () => logic.saveSettings();
         $("export-btn").onclick = () => this.exportCSV();
         $("clear-btn").onclick = () => this.clearDB();
+        $("clear-cache-btn").onclick = () => this.clearCacheAndReload();
         $("logout-btn").onclick = () => fbService.logout();
 
         // Listeners para el nuevo modal de confirmación
@@ -315,6 +316,32 @@ const app = {
                 await this.loadScans();
                 this.toast("Historial borrado", "success");
                 this.hideConfirmation();
+            }
+        });
+    },
+    async clearCacheAndReload() {
+        this.showConfirmation({
+            title: 'Limpiar Caché',
+            message: 'Esto forzará la recarga de todos los archivos de la aplicación. Es útil si la app no funciona correctamente. ¿Continuar?',
+            icon: '🧹',
+            confirmText: 'Sí, limpiar',
+            onConfirm: async () => {
+                this.hideConfirmation();
+                this.toast("Limpiando caché y Service Worker...", "info", 4000);
+                try {
+                    const registrations = await navigator.serviceWorker.getRegistrations();
+                    for (const registration of registrations) {
+                        await registration.unregister();
+                    }
+                    const cacheKeys = await caches.keys();
+                    await Promise.all(cacheKeys.map(key => caches.delete(key)));
+
+                    this.toast("Limpieza completa. Recargando...", "success", 2000);
+                    setTimeout(() => { window.location.reload(); }, 1500);
+                } catch (error) {
+                    console.error("Error al limpiar la caché:", error);
+                    this.toast("Error al limpiar la caché", "error");
+                }
             }
         });
     },
