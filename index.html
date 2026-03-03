@@ -1,4 +1,4 @@
-﻿﻿<!doctype html>
+﻿﻿﻿﻿<!doctype html>
 <html lang="es">
 
 <head>
@@ -102,59 +102,7 @@
     <header class="ph">
       <div class="title" data-i18n="header_settings">Settings</div><button class="icon-btn" data-close="settings">✕</button>
     </header>
-    <div class="pc">
-      <div class="user-info">
-        <img id="user-avatar-img" class="user-avatar" src="" />
-        <div style="flex:1">
-          <div style="font-size:10px;color:#888" data-i18n="lbl_connected_as">CONNECTED AS</div>
-          <div id="user-display-name" class="user-name">...</div>
-        </div>
-        <button id="logout-btn" class="btn btn-danger" style="padding:6px 12px;font-size:12px" data-i18n="btn_logout">Logout</button>
-      </div>
-      <div style="margin-bottom:14px"><label class="label" data-i18n="lbl_language">Language</label>
-        <select id="lang-select" class="select">
-          <option value="en">English</option>
-          <option value="es">Español</option>
-          <option value="fr">Français</option>
-        </select>
-      </div>
-      <div style="margin-bottom:14px"><label class="label" data-i18n="lbl_dark_mode">Dark Mode</label>
-        <div class="row"><span data-i18n="lbl_enable_dark_mode">Enable Dark Mode</span><label class="sw"><input type="checkbox"
-              id="dark-mode-toggle" checked /><span class="sl"></span></label></div>
-      </div>
-      <div style="margin-bottom:14px"><label class="label" data-i18n="lbl_scan_mode">Scan Mode</label>
-        <div class="seg"><button id="mode-full" class="mode on" type="button">FULL PI</button><button id="mode-short"
-            class="mode" type="button">SHORT</button></div>
-      </div>
-      <div style="margin-bottom:14px"><label class="label" data-i18n="lbl_batch">Batch</label>
-        <div class="row"><span data-i18n="lbl_batch_enable">Enable batch scanning</span><label class="sw"><input type="checkbox"
-              id="batch-toggle" /><span class="sl"></span></label></div><select id="batch-layout" class="select"
-          disabled>
-          <option value="QWERTY">QWERTY</option>
-          <option value="AZERTY">AZERTY</option>
-          <option value="QWERTZU">QWERTZU</option>
-        </select>
-      </div>
-      <div style="margin-bottom:14px"><label class="label" data-i18n="lbl_validation">Validation</label>
-        <div class="row"><span data-i18n="lbl_ocr">OCR correction (O to 0)</span><label class="sw"><input type="checkbox"
-              id="ocr-toggle" /><span class="sl"></span></label></div><input id="full-prefix" class="input"
-          placeholder="Full prefix" data-i18n-ph="ph_full_prefix" /><input id="short-prefix" class="input" placeholder="Short prefix" data-i18n-ph="ph_short_prefix"
-          style="margin-top:8px" />
-      </div>
-      <div style="margin-bottom:14px"><label class="label" data-i18n="lbl_theme">Visual Theme</label>
-        <select id="theme-select" class="select">
-          <option value="midnight">Midnight Steel</option>
-          <option value="sunset">Sunset Ember</option>
-          <option value="forest">Forest Neon</option>
-          <option value="ice">Ice Graphite</option>
-        </select>
-      </div>
-      <div><label class="label" data-i18n="lbl_local_data">Local Data</label><button id="export-btn" class="btn"
-          style="width:100%;margin-bottom:8px" data-i18n="btn_export">Export CSV</button>
-        <button id="clear-btn" class="btn btn-danger" style="width:100%;margin-bottom:8px" data-i18n="btn_clear_hist">Clear local history</button>
-        <button id="clear-cache-btn" class="btn btn-danger" style="width:100%" data-i18n="btn_clear_cache">Clear Cache and Reload</button>
-      </div>
-    </div>
+    <div class="pc"></div>
   </section>
   <script type="module" src="app.js"></script>
 </body>

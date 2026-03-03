@@ -196,33 +196,37 @@ const logic = {
     loadSettings() {
         const s = localStorage.getItem("barra_settings");
         if (s) this.settings = { ...this.settings, ...JSON.parse(s) };
-        document.getElementById("full-prefix").value = this.settings.fullPrefix;
-        document.getElementById("short-prefix").value = this.settings.shortPrefix;
-        document.getElementById("ocr-toggle").checked = this.settings.ocrCorrection;
-        document.querySelectorAll(".theme-btn").forEach(btn => {
-            btn.classList.toggle("on", btn.dataset.theme === (this.settings.theme || "midnight"));
-        });
-        const dmToggle = document.getElementById("dark-mode-toggle");
-        if (dmToggle) dmToggle.checked = this.settings.darkMode !== false; // Default true
-        const themeContainer = document.getElementById("theme-selector-container");
-        if (themeContainer) themeContainer.style.display = dmToggle.checked ? 'block' : 'none';
-        const langSelect = document.getElementById("lang-select");
-        if (langSelect) langSelect.value = this.settings.lang || "en";
         this.applyTheme(this.settings.theme);
+    },
+    updateSettingsUI() {
+        const $ = id => document.getElementById(id);
+        if (!$("full-prefix")) return; // Si no está renderizado, salir
+
+        $("full-prefix").value = this.settings.fullPrefix;
+        $("short-prefix").value = this.settings.shortPrefix;
+        $("ocr-toggle").checked = this.settings.ocrCorrection;
+        
+        const themeSelect = $("theme-select");
+        if (themeSelect) themeSelect.value = this.settings.theme || "midnight";
+
+        const dmToggle = $("dark-mode-toggle");
+        if (dmToggle) dmToggle.checked = this.settings.darkMode !== false;
+        
+        const langSelect = $("lang-select");
+        if (langSelect) langSelect.value = this.settings.lang || "en";
     },
     saveSettings() {
         this.settings.fullPrefix = document.getElementById("full-prefix").value.trim();
         this.settings.shortPrefix = document.getElementById("short-prefix").value.trim();
         this.settings.ocrCorrection = document.getElementById("ocr-toggle").checked;
         this.settings.darkMode = document.getElementById("dark-mode-toggle").checked;
-        const selectedThemeBtn = document.querySelector(".theme-btn.on");
-        if (selectedThemeBtn) {
-            this.settings.theme = selectedThemeBtn.dataset.theme;
-        }
-        const themeContainer = document.getElementById("theme-selector-container");
-        if (themeContainer) themeContainer.style.display = this.settings.darkMode ? 'block' : 'none';
+        
+        const themeSelect = document.getElementById("theme-select");
+        if (themeSelect) this.settings.theme = themeSelect.value;
+
         const langSelect = document.getElementById("lang-select");
         if (langSelect) this.settings.lang = langSelect.value;
+        
         this.applyTheme(this.settings.theme);
         localStorage.setItem("barra_settings", JSON.stringify(this.settings))
     },
@@ -252,7 +256,7 @@ const logic = {
 
 // --- APP MODULE ---
 const app = {
-    mode: "FULL", scans: [], tempScan: null, filter: "all", scanner: null, scannerState: "idle", batchMode: false, batchCount: 0, batchLayout: "QWERTY", syncIntervalId: null, isHandling: false, lastCode: "", lastAt: 0, restartTimer: null, pauseMs: 1300, appInitialized: false, confirmCallback: null, scansLoaded: false,
+    mode: "FULL", scans: [], tempScan: null, filter: "all", scanner: null, scannerState: "idle", batchMode: false, batchCount: 0, batchLayout: "QWERTY", syncIntervalId: null, isHandling: false, lastCode: "", lastAt: 0, restartTimer: null, pauseMs: 1300, appInitialized: false, confirmCallback: null, scansLoaded: false, settingsRendered: false,
     
     async init(user) {
         // The main auth guard has already run. We are definitely authenticated here.
@@ -275,12 +279,6 @@ const app = {
         this.updateLanguage();
         this.bind();
 
-        // Set user info
-        const userDisplay = document.getElementById("user-display-name");
-        const avatar = document.getElementById("user-avatar-img");
-        userDisplay.textContent = fbService.getUserDisplay();
-        avatar.src = user.photoURL || `https://ui-avatars.com/api/?name=${userDisplay.textContent}&background=random`;
-        
         // Start camera and network services as early as possible
         this.startScanner();
         this.startAutoSync();
@@ -298,7 +296,7 @@ const app = {
         $("n-sync").onclick = () => this.runFullSync();
         $("search").oninput = e => this.renderList(e.target.value);
         $("n-history").onclick = () => { this.show("history"); this.setNav("n-history") };
-        $("n-settings").onclick = () => { this.show("settings"); this.setNav("n-settings") };
+        $("n-settings").onclick = () => { this.renderSettings(); this.show("settings"); this.setNav("n-settings") };
         $("n-image").onclick = () => { $("file").click(); this.setNav("n-image") };
         $("n-nfc").onclick = () => { this.startNFC(); this.setNav("n-nfc") };
         $("file").onchange = e => this.scanImage(e);
@@ -307,28 +305,6 @@ const app = {
         $("big-alert").onclick = (e) => { if (e.target.id === "big-alert") document.getElementById("big-alert").classList.remove("on") };
         document.querySelectorAll("[data-close]").forEach(b => b.onclick = () => this.close());
         document.querySelectorAll(".tab").forEach(t => t.onclick = () => this.filterList(t.dataset.filter || "all"));
-        $("mode-full").onclick = () => this.setMode("FULL");
-        $("mode-short").onclick = () => this.setMode("SHORT");
-        $("batch-toggle").onchange = () => this.toggleBatch();
-        $("batch-layout").onchange = e => this.batchLayout = e.target.value;
-        document.querySelectorAll(".input,.select").forEach(el => { el.onchange = () => logic.saveSettings(); el.onblur = () => logic.saveSettings() });
-        $("ocr-toggle").onchange = () => logic.saveSettings();
-        document.querySelectorAll(".theme-btn").forEach(btn => {
-            btn.onclick = () => {
-                document.querySelectorAll(".theme-btn").forEach(b => b.classList.remove("on"));
-                btn.classList.add("on");
-                logic.saveSettings();
-            };
-        });
-        $("dark-mode-toggle").onchange = () => logic.saveSettings();
-        $("lang-select").onchange = () => {
-            logic.saveSettings();
-            this.updateLanguage();
-        };
-        $("export-btn").onclick = () => this.exportCSV();
-        $("clear-btn").onclick = () => this.clearDB();
-        $("clear-cache-btn").onclick = () => this.clearCacheAndReload();
-        $("logout-btn").onclick = () => fbService.logout();
 
         // Listeners para el nuevo modal de confirmación
         const confirmModal = document.getElementById('confirm-modal');
@@ -344,6 +320,46 @@ const app = {
 
         window.addEventListener("online", () => { this.updateConnectionStatus(); this.startAutoSync() });
         window.addEventListener("offline", () => { this.updateConnectionStatus(); this.stopAutoSync() })
+    },
+    renderSettings() {
+        if (this.settingsRendered) return;
+        const pc = document.querySelector("#settings .pc");
+        pc.innerHTML = `<div class="user-info"><img id="user-avatar-img" class="user-avatar" src=""><div style="flex:1"><div style="font-size:10px;color:#888" data-i18n="lbl_connected_as">CONNECTED AS</div><div id="user-display-name" class="user-name">...</div></div><button id="logout-btn" class="btn btn-danger" style="padding:6px 12px;font-size:12px" data-i18n="btn_logout">Logout</button></div><div style="margin-bottom:14px"><label class="label" data-i18n="lbl_language">Language</label><select id="lang-select" class="select"><option value="en">English</option><option value="es">Español</option><option value="fr">Français</option></select></div><div style="margin-bottom:14px"><label class="label" data-i18n="lbl_dark_mode">Dark Mode</label><div class="row"><span data-i18n="lbl_enable_dark_mode">Enable Dark Mode</span><label class="sw"><input type="checkbox" id="dark-mode-toggle" checked><span class="sl"></span></label></div></div><div style="margin-bottom:14px"><label class="label" data-i18n="lbl_scan_mode">Scan Mode</label><div class="seg"><button id="mode-full" class="mode on" type="button">FULL PI</button><button id="mode-short" class="mode" type="button">SHORT</button></div></div><div style="margin-bottom:14px"><label class="label" data-i18n="lbl_batch">Batch</label><div class="row"><span data-i18n="lbl_batch_enable">Enable batch scanning</span><label class="sw"><input type="checkbox" id="batch-toggle"><span class="sl"></span></label></div><select id="batch-layout" class="select" disabled><option value="QWERTY">QWERTY</option><option value="AZERTY">AZERTY</option><option value="QWERTZU">QWERTZU</option></select></div><div style="margin-bottom:14px"><label class="label" data-i18n="lbl_validation">Validation</label><div class="row"><span data-i18n="lbl_ocr">OCR correction (O to 0)</span><label class="sw"><input type="checkbox" id="ocr-toggle"><span class="sl"></span></label></div><input id="full-prefix" class="input" placeholder="Full prefix" data-i18n-ph="ph_full_prefix"><input id="short-prefix" class="input" placeholder="Short prefix" data-i18n-ph="ph_short_prefix" style="margin-top:8px"></div><div style="margin-bottom:14px"><label class="label" data-i18n="lbl_theme">Visual Theme</label><select id="theme-select" class="select"><option value="midnight">Midnight Steel</option><option value="sunset">Sunset Ember</option><option value="forest">Forest Neon</option><option value="ice">Ice Graphite</option></select></div><div><label class="label" data-i18n="lbl_local_data">Local Data</label><button id="export-btn" class="btn" style="width:100%;margin-bottom:8px" data-i18n="btn_export">Export CSV</button><button id="clear-btn" class="btn btn-danger" style="width:100%;margin-bottom:8px" data-i18n="btn_clear_hist">Clear local history</button><button id="clear-cache-btn" class="btn btn-danger" style="width:100%" data-i18n="btn_clear_cache">Clear Cache and Reload</button></div>`;
+
+        const $ = id => document.getElementById(id);
+        
+        // Bind events
+        $("mode-full").onclick = () => this.setMode("FULL");
+        $("mode-short").onclick = () => this.setMode("SHORT");
+        $("batch-toggle").onchange = () => this.toggleBatch();
+        $("batch-layout").onchange = e => this.batchLayout = e.target.value;
+        pc.querySelectorAll(".input,.select").forEach(el => { el.onchange = () => logic.saveSettings(); el.onblur = () => logic.saveSettings() });
+        $("ocr-toggle").onchange = () => logic.saveSettings();
+        $("dark-mode-toggle").onchange = () => logic.saveSettings();
+        $("lang-select").onchange = () => { logic.saveSettings(); this.updateLanguage(); };
+        $("theme-select").onchange = () => logic.saveSettings();
+        $("export-btn").onclick = () => this.exportCSV();
+        $("clear-btn").onclick = () => this.clearDB();
+        $("clear-cache-btn").onclick = () => this.clearCacheAndReload();
+        $("logout-btn").onclick = () => fbService.logout();
+
+        // Populate UI
+        logic.updateSettingsUI();
+        
+        // Set User Info
+        const user = fbService.currentUser;
+        if (user) {
+            $("user-display-name").textContent = fbService.getUserDisplay();
+            $("user-avatar-img").src = user.photoURL || `https://ui-avatars.com/api/?name=${fbService.getUserDisplay()}&background=random`;
+        }
+
+        // Translate new content
+        this.updateLanguage();
+        
+        // Sync current mode UI
+        this.setMode(this.mode);
+
+        this.settingsRendered = true;
     },
     updateLanguage() {
         document.querySelectorAll("[data-i18n]").forEach(el => {
@@ -365,7 +381,12 @@ const app = {
         document.querySelectorAll(".panel.on").forEach(p => { p.classList.remove("on"); p.setAttribute("aria-hidden", "true") }); document.getElementById("backdrop").classList.remove("on"); if (reset) this.setNav("")
     },
     toggleBatch() { this.batchMode = document.getElementById("batch-toggle").checked; document.getElementById("batch-layout").disabled = !this.batchMode; if (!this.batchMode) this.batchCount = 0; this.updateMetrics() },
-    setMode(m) { this.mode = m; document.getElementById("mode-full").classList.toggle("on", m === "FULL"); document.getElementById("mode-short").classList.toggle("on", m === "SHORT"); document.getElementById("mode-tag").textContent = `${m} MODE`; this.status(`${m} mode active`) },
+    setMode(m) { 
+        this.mode = m; 
+        const btnFull = document.getElementById("mode-full");
+        if (btnFull) { btnFull.classList.toggle("on", m === "FULL"); document.getElementById("mode-short").classList.toggle("on", m === "SHORT"); }
+        document.getElementById("mode-tag").textContent = `${m} MODE`; this.status(`${m} mode active`) 
+    },
     toast(msg, type = "info", dur = 2200) { const c = document.getElementById("toast"), t = document.createElement("div"), ic = type === "success" ? "✓" : type === "warning" ? "!" : type === "error" ? "✕" : "•"; t.className = `t ${type}`; t.innerHTML = `<span>${ic}</span><span>${msg}</span>`; c.appendChild(t); requestAnimationFrame(() => t.classList.add("show")); setTimeout(() => { t.classList.remove("show"); t.addEventListener("transitionend", () => t.remove(), { once: true }) }, dur) },
     feedback(type = "success") { const f = document.getElementById("frame"), flash = document.getElementById("flash"); f.classList.remove("success", "warning", "error"); f.classList.add(type); if (type === "success") { flash.classList.add("on"); setTimeout(() => flash.classList.remove("on"), 120); if (navigator.vibrate) navigator.vibrate(120); this.beep(940, .05) } if (type === "warning") { if (navigator.vibrate) navigator.vibrate([45, 40, 45]); this.beep(440, .05) } if (type === "error") this.beep(300, .08); setTimeout(() => f.classList.remove("success", "warning", "error"), 420) },
     beep(freq, dur, type = "sine", vol = 0.02) { try { const a = new (window.AudioContext || window.webkitAudioContext)(), o = a.createOscillator(), g = a.createGain(); o.type = type; o.frequency.value = freq; g.gain.value = vol; o.connect(g); g.connect(a.destination); o.start(); setTimeout(() => { o.stop(); a.close() }, dur * 1000) } catch (_) { } },
