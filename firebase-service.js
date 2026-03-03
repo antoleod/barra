@@ -24,7 +24,7 @@ import {
 
 const FAKE_DOMAIN = "@barrascanner.local";
 const ENV_ERROR =
-    "Firebase no esta disponible en este entorno. Usa 'firebase serve' (http://localhost:5000) o Firebase Hosting.";
+    "Firebase is not available in this environment. Use 'firebase serve' (http://localhost:5000) or Firebase Hosting.";
 
 async function tryGetJson(url) {
     try {
@@ -65,7 +65,7 @@ async function createFirebaseRuntime() {
 
     // Verificación de seguridad: Detectar si se usan las credenciales de ejemplo
     if (firebaseConfig.apiKey === "TU_API_KEY_AQUI") {
-        console.error("[firebase-service] FALTA CONFIGURACIÓN: Reemplaza los valores en 'firebase-service.js' con los de tu proyecto Firebase.");
+        console.error("[firebase-service] MISSING CONFIGURATION: Replace values in 'firebase-service.js' with your Firebase project's.");
         return { app: null, auth: null, db: null, enabled: false };
     }
 
@@ -101,6 +101,28 @@ export const fbService = {
         });
     },
 
+    /**
+     * Returns a Promise that resolves with the initial user authentication state.
+     * This is crucial for implementing a route guard that waits for auth to be resolved.
+     */
+    getInitialUser() {
+        return new Promise((resolve, reject) => {
+            if (!this.enabled) {
+                return resolve(null);
+            }
+            // onAuthStateChanged fires immediately with the current state.
+            // We only want the first result for our initial guard check.
+            const unsubscribe = onAuthStateChanged(this.auth, user => {
+                unsubscribe(); // Stop listening after the first result
+                this.currentUser = user;
+                resolve(user);
+            }, err => {
+                unsubscribe();
+                reject(err);
+            });
+        });
+    },
+
     async createUserProfile(user) {
         if (!runtime.enabled || !user) return;
         const userRef = doc(runtime.db, "users", user.uid);
@@ -115,7 +137,7 @@ export const fbService = {
         try {
             await setDoc(userRef, profileData);
         } catch (error) {
-            console.error("Error creando el perfil de usuario:", error);
+            console.error("Error creating user profile:", error);
         }
     },
 
@@ -138,7 +160,7 @@ export const fbService = {
         if (!runtime.enabled) return unavailableResult();
         const sanitizedUsername = username.trim().toLowerCase().replace(/[^a-z0-9]/g, "");
         if (!sanitizedUsername) {
-            return { success: false, error: "Nombre de usuario invalido." };
+            return { success: false, error: "Invalid username." };
         }
 
         const email = `${sanitizedUsername}${FAKE_DOMAIN}`;
@@ -162,12 +184,12 @@ export const fbService = {
                     return { success: true, user: newResult.user, isNew: true };
                 } catch (createError) {
                     if (createError.code === "auth/email-already-in-use") {
-                        return { success: false, error: "El PIN es incorrecto." };
+                        return { success: false, error: "Incorrect PIN." };
                     }
-                    return { success: false, error: "No se pudo crear la cuenta." };
+                    return { success: false, error: "Could not create account." };
                 }
             }
-            return { success: false, error: `Error de autenticacion: ${error.code}` };
+            return { success: false, error: `Authentication error: ${error.code}` };
         }
     },
 
@@ -178,7 +200,7 @@ export const fbService = {
 
     async syncScans(localPendingScans) {
         if (!runtime.enabled) throw new Error(ENV_ERROR);
-        if (!this.currentUser) throw new Error("No autenticado");
+        if (!this.currentUser) throw new Error("Not authenticated");
 
         const uid = this.currentUser.uid;
         const userScansRef = collection(runtime.db, "users", uid, "scans");
@@ -199,7 +221,7 @@ export const fbService = {
                 );
                 pushedCount++;
             } catch (error) {
-                console.error("Error subiendo scan", scan, error);
+                console.error("Error uploading scan", scan, error);
                 errors.push({ scan, error });
             }
         }
@@ -208,9 +230,9 @@ export const fbService = {
         if (errors.length > 0 && errors.length === localPendingScans.length) {
             const firstErrorCode = errors[0].error.code;
             if (firstErrorCode === 'permission-denied') {
-                throw new Error("Error de permisos. Revisa las reglas de seguridad de Firestore.");
+                throw new Error("Permission error. Check Firestore security rules.");
             }
-            throw new Error(`Falló la subida de ${errors.length} registros.`);
+            throw new Error(`Upload failed for ${errors.length} records.`);
         }
 
         const q = query(userScansRef);

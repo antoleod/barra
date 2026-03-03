@@ -21,12 +21,12 @@ const setStatus = (message, type = "error") => {
 const setLoading = (button, isLoading) => {
   button.disabled = isLoading;
   if (isLoading) {
-    button.innerHTML = `<span class="spinner" style="width:20px; height:20px; border-width:2px;"></span> Conectando...`;
+    button.innerHTML = `<span class="spinner" style="width:20px; height:20px; border-width:2px;"></span> Connecting...`;
   } else {
     if (button.id === "btn-google") {
-      button.innerHTML = `<span>G</span> <span>Continuar con Google</span>`;
+      button.innerHTML = `<span>G</span> <span>Continue with Google</span>`;
     } else {
-      button.innerHTML = "Entrar / Crear";
+      button.innerHTML = "Enter / Create";
     }
   }
 };
@@ -57,32 +57,32 @@ togglePinVisBtn.onclick = () => {
 };
 
 btnGoogle.onclick = async () => {
-  if (!navigator.onLine) return setStatus("Necesitas conexion a internet para iniciar sesion.");
+  if (!navigator.onLine) return setStatus("Internet connection required to login.");
   setLoading(btnGoogle, true);
-  setStatus("Iniciando con Google...", "info");
+  setStatus("Starting with Google...", "info");
   const res = await fbService.loginGoogle();
   if (!res.success) {
     setLoading(btnGoogle, false);
     if (res.error.includes("popup-closed-by-user")) {
-      setStatus("Proceso cancelado.");
+      setStatus("Process cancelled.");
     } else {
-      setStatus("Error de autenticacion.");
+      setStatus("Authentication error.");
     }
   }
 };
 
 btnPinLogin.onclick = async () => {
-  if (!navigator.onLine) return setStatus("Necesitas conexion a internet para iniciar sesion.");
+  if (!navigator.onLine) return setStatus("Internet connection required to login.");
 
   const u = pinUserInput.value.trim();
   const p = pinCodeInput.value;
   if (!u || !p) {
-    setStatus("Usuario y PIN son requeridos.");
+    setStatus("Username and PIN are required.");
     return;
   }
 
   setLoading(btnPinLogin, true);
-  setStatus("Verificando...", "info");
+  setStatus("Verifying...", "info");
   localStorage.setItem("lastUsername", u);
 
   const res = await fbService.loginPin(u, p);
@@ -90,20 +90,50 @@ btnPinLogin.onclick = async () => {
     setLoading(btnPinLogin, false);
     setStatus(res.error);
   } else if (res.isNew) {
-    setStatus("Cuenta creada. Redirigiendo...", "success");
+    setStatus("Account created. Redirecting...", "success");
   }
 };
 
-document.addEventListener("DOMContentLoaded", () => {
-  fbService.init((user) => {
-    if (user) {
-      setStatus("Sesion encontrada. Redirigiendo...", "success");
-      window.location.replace("./index.html");
-    }
-  });
+/**
+ * Main entry point for the login page. Acts as an auth guard.
+ */
+async function main() {
+    try {
+        const user = await fbService.getInitialUser();
 
-  const lastUsername = localStorage.getItem("lastUsername");
-  if (lastUsername) {
-    pinUserInput.value = lastUsername;
-  }
+        if (user) {
+            // User is already logged in, redirect to the main app.
+            setStatus("Session found. Redirecting...", "success");
+            setTimeout(() => window.location.replace('./index.html'), 500);
+            return; // Stop further execution.
+        }
+
+        // No user found. Reveal Login UI.
+        const container = document.querySelector(".login-container");
+        const loader = document.getElementById("app-loader");
+
+        if (container) container.style.display = "grid";
+        if (loader) {
+            loader.style.opacity = "0";
+            setTimeout(() => loader.remove(), 300);
+        }
+        
+        // Restore last used username if available.
+        const lastUsername = localStorage.getItem("lastUsername");
+        if (lastUsername) {
+            pinUserInput.value = lastUsername;
+        }
+
+    } catch (error) {
+        console.error("Login page initialization error:", error);
+        setLoading(btnGoogle, false);
+        setLoading(btnPinLogin, false);
+        setStatus("Error verifying session. Try again.", "error");
+    }
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+    // The fbService.init() is for ongoing changes, which is not needed on this page
+    // as any successful login will cause a redirect. We just need the initial check.
+    main();
 });
