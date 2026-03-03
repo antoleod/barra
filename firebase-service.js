@@ -46,12 +46,13 @@ async function loadFirebaseConfig() {
     // Rellena esto con los datos de tu proyecto desde la consola de Firebase
     // (Project Settings > General > Your apps > Web app > SDK setup and configuration)
     return {
-        apiKey: "TU_API_KEY_AQUI",
-        authDomain: "tu-proyecto.firebaseapp.com",
-        projectId: "tu-proyecto",
-        storageBucket: "tu-proyecto.appspot.com",
-        messagingSenderId: "123456789",
-        appId: "1:123456789:web:abcdef",
+        apiKey: "AIzaSyBIwE2kuScBVJBK1aTSFo8IlM2HyjVasLc",
+        authDomain: "lectorqr-45291.firebaseapp.com",
+        projectId: "lectorqr-45291",
+        storageBucket: "lectorqr-45291.appspot.com",
+        messagingSenderId: "751229393866",
+        appId: "1:751229393866:web:1cce5fa16380435ca94d33",
+        measurementId: "G-BE9R1XH54E"
     };
 }
 
@@ -59,6 +60,12 @@ async function createFirebaseRuntime() {
     const firebaseConfig = await loadFirebaseConfig();
     if (!firebaseConfig) {
         console.warn("[firebase-service]", ENV_ERROR);
+        return { app: null, auth: null, db: null, enabled: false };
+    }
+
+    // Verificación de seguridad: Detectar si se usan las credenciales de ejemplo
+    if (firebaseConfig.apiKey === "TU_API_KEY_AQUI") {
+        console.error("[firebase-service] FALTA CONFIGURACIÓN: Reemplaza los valores en 'firebase-service.js' con los de tu proyecto Firebase.");
         return { app: null, auth: null, db: null, enabled: false };
     }
 
