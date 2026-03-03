@@ -6,7 +6,6 @@ const CORE = [
   "./styles.css",
   "./app.js",
   "./login.js",
-  "/__/firebase/init.json", // Cachear la configuración automática
   "./firebase-service.js",
   "./manifest.webmanifest",
   "./icon.svg",
@@ -59,9 +58,7 @@ self.addEventListener("fetch", (event) => {
             const fallback = url.pathname.includes("login") ? "./login.html" : "./index.html";
             return caches.match(fallback);
           }
-          // For non-navigation requests, let the fetch fail.
-          // Returning undefined here causes a TypeError.
-          // By returning nothing, the promise from the catch rejects, and the browser handles the network error.
+          return Response.error();
         })
     )
   );
