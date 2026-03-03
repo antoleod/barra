@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport"
+        content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no" />
+    <title>Login - Barra Scanner</title>
+    <link rel="icon" href="icon.svg" type="image/svg+xml">
+    <meta name="theme-color" content="#0b0d10" />
+    <link rel="manifest" href="manifest.webmanifest" />
+
+    <!-- Firebase SDKs -->
+    <script src="/__/firebase/10.7.1/firebase-app.js"></script>
+    <script src="/__/firebase/10.7.1/firebase-auth.js"></script>
+    <script src="/__/firebase/10.7.1/firebase-firestore.js"></script>
+    <!-- Inicializa Firebase usando la configuración del hosting -->
+    <script src="/__/firebase/init.js"></script>
+
+    <link rel="stylesheet" href="styles.css" />
+</head>
+
+<body>
+    <div class="login-container">
+        <div class="login-card">
+            <div class="login-header">
+                <div class="logo">📡</div>
+                <div class="title">Barra Scanner</div>
+            </div>
+
+            <div class="segmented-control">
+                <button id="tab-google" class="active">Google</button>
+                <button id="tab-pin">Usuario y PIN</button>
+            </div>
+
+            <div id="form-google">
+                <button id="btn-google" class="btn-primary">
+                    <span>G</span>
+                    <span>Continuar con Google</span>
+                </button>
+            </div>
+
+            <div id="form-pin" style="display: none; flex-direction: column; gap: 16px;">
+                <div class="form-group">
+                    <input id="pin-user" class="input" placeholder="Nombre de usuario" autocomplete="username" />
+                </div>
+                <div class="form-group">
+                    <div class="input-group">
+                        <input id="pin-code" type="password" class="input" placeholder="PIN de 6 dígitos" maxlength="6"
+                            autocomplete="current-password" />
+                        <button id="toggle-pin-vis" class="toggle-vis" aria-label="Mostrar/Ocultar PIN">👁️</button>
+                    </div>
+                </div>
+                <button id="btn-pin-login" class="btn-primary">Entrar / Crear</button>
+                <div class="form-helper-text">Si el usuario no existe, se creará automáticamente.</div>
+            </div>
+            <div id="login-status" class="login-status"></div>
+        </div>
+    </div>
+    <script type="module" src="login.js"></script>
+</body>
+
+</html>
