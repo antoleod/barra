@@ -1,4 +1,4 @@
-﻿const CACHE = "barra-scanner-v7-firebase-hosting";
+﻿const CACHE = "barra-scanner-v8-local-dev-fix";
 const CORE = [
   "./",
   "./index.html",
@@ -6,15 +6,15 @@ const CORE = [
   "./styles.css",
   "./app.js",
   "./login.js",
+  "./firebase-config.js", // Cachear la configuración
   "./firebase-service.js",
   "./manifest.webmanifest",
   "./icon.svg",
   "https://unpkg.com/html5-qrcode",
-  // Cachear los SDK de Firebase y el script de inicialización
-  "/__/firebase/10.7.1/firebase-app.js",
-  "/__/firebase/10.7.1/firebase-auth.js",
-  "/__/firebase/10.7.1/firebase-firestore.js",
-  "/__/firebase/init.js",
+  // Cachear los módulos de Firebase desde el CDN
+  "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js",
+  "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js",
+  "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js",
 ];
 
 self.addEventListener("install", (event) => {

@@ -1,5 +1,7 @@
 import {
-    getApp,
+    initializeApp
+} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+import {
     getAuth,
     GoogleAuthProvider,
     signInWithPopup,
@@ -22,9 +24,9 @@ import {
     Timestamp,
     serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { firebaseConfig } from "./firebase-config.js";
 
-// La app se inicializa automáticamente con /__/firebase/init.js
-const app = getApp();
+const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = initializeFirestore(app, {
     localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() })
