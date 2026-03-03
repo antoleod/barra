@@ -43,6 +43,7 @@ async function loadFirebaseConfig() {
     if (window.location.hostname === "127.0.0.1" || window.location.hostname === "localhost") {
         if (window.location.port === "5500" || window.location.port === "8080") return null;
     }
+    if (window.location.hostname === "oryxen.tech") return null;
 
     const hostingConfig = await tryGetJson("/__/firebase/init.json");
     if (hostingConfig) return hostingConfig;
