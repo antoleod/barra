@@ -14,8 +14,11 @@
   <script>
     try {
       const settings = JSON.parse(localStorage.getItem("barra_settings") || "{}");
-      if (settings.theme) document.documentElement.setAttribute("data-theme", settings.theme);
-    } catch (_) { }
+      const theme = settings.theme || "midnight";
+      document.documentElement.setAttribute("data-theme", theme);
+    } catch (_) {
+      document.documentElement.setAttribute("data-theme", "midnight");
+    }
   </script>
   <link rel="manifest" href="manifest.webmanifest" />
   <link rel="stylesheet" href="styles.css" />
