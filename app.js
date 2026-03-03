@@ -119,9 +119,14 @@ const app = {
     async init() {
         // Firebase Init
         fbService.init(async (user) => {
+            this.updateConnectionStatus(); // Actualizar estado en cada cambio de auth
+
             if (!user) {
-                // Si en cualquier momento el usuario es nulo, redirigir al login.
-                window.location.replace('./login.html');
+                // Si en cualquier momento el usuario es nulo, y Firebase está habilitado, redirigir al login.
+                // Evita bucles de redirección si Firebase no se carga.
+                if (fbService.enabled) {
+                    window.location.replace('./login.html');
+                }
                 return;
             }
 
@@ -133,7 +138,6 @@ const app = {
                 logic.loadSettings();
                 this.bind();
                 await this.loadScans();
-                this.updateOnline();
                 this.registerSW();
 
                 const userDisplay = document.getElementById("user-display-name");
@@ -144,6 +148,8 @@ const app = {
                 this.startAutoSync();
             }
         });
+        // Comprobación inicial del estado de la conexión
+        this.updateConnectionStatus();
     },
 
     bind() {
@@ -184,8 +190,8 @@ const app = {
             confirmModal.onclick = (e) => { if (e.target.id === 'confirm-modal') this.hideConfirmation(); };
         }
 
-        window.addEventListener("online", () => { this.updateOnline(); this.startAutoSync() });
-        window.addEventListener("offline", () => { this.updateOnline(); this.stopAutoSync() })
+        window.addEventListener("online", () => { this.updateConnectionStatus(); this.startAutoSync() });
+        window.addEventListener("offline", () => { this.updateConnectionStatus(); this.stopAutoSync() })
     },
     registerSW() { if ("serviceWorker" in navigator) { navigator.serviceWorker.register("./sw.js").catch(() => { }) } },
     setNav(id) { document.querySelectorAll("#nav .n").forEach(b => b.classList.toggle("on", b.id === id)); if (id === "n-image") setTimeout(() => document.querySelectorAll("#nav .n").forEach(b => b.classList.remove("on")), 500) },
@@ -204,7 +210,27 @@ const app = {
     renderList(term = "") { const list = document.getElementById("log"); list.innerHTML = ""; const f = this.scans.filter(s => this.filter === "pending" ? s.status === "pending" : this.filter === "sent" ? s.status === "sent" : true).filter(s => (s.code_normalized || "").toLowerCase().includes(term.toLowerCase())).sort((a, b) => new Date(b.date) - new Date(a.date)); if (!f.length) { const d = document.createElement("div"); d.className = "item"; d.textContent = "No hay registros para mostrar."; list.appendChild(d); return } f.forEach(scan => { const li = document.createElement("li"); li.className = "item"; const dt = new Date(scan.date).toLocaleString([], { year: "2-digit", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" }); li.innerHTML = `<div class="ih"><div class="code">${scan.code_normalized}</div><div class="time">${dt}</div></div><div class="meta"><span class="badge badge-${String(scan.pi_mode || "SHORT").toLowerCase()}">${scan.pi_mode || "UNK"}</span><span class="badge badge-${scan.status}">${scan.status}</span>${scan.used ? '<span class="badge badge-used">USED</span>' : ''}</div><div style="display:flex;justify-content:flex-end">${!scan.used ? `<button class="btn" data-used="${scan.id}">Marcar usado</button>` : ""}</div>`; list.appendChild(li) }); list.querySelectorAll("[data-used]").forEach(b => b.onclick = async e => { e.stopPropagation(); await this.markUsed(Number(b.dataset.used)) }) },
     async markUsed(id) { await db.markUsed(id); await this.loadScans(); this.toast("Marcado como usado") },
     filterList(type) { this.filter = type; document.querySelectorAll(".tab").forEach(t => t.classList.toggle("on", t.dataset.filter === type)); this.renderList(document.getElementById("search").value || "") },
-    updateOnline() { const on = navigator.onLine; document.getElementById("dot").classList.toggle("offline", !on); document.getElementById("offline").style.display = on ? "none" : "inline" },
+    updateConnectionStatus() {
+        const dot = document.getElementById("dot");
+        const offlineIndicator = document.getElementById("offline");
+        const isOnline = navigator.onLine;
+
+        offlineIndicator.style.display = isOnline ? "none" : "inline";
+        dot.classList.remove("offline", "warning"); // Reinicia clases de estado
+
+        if (!isOnline) {
+            dot.classList.add("offline"); // Rojo si no hay internet
+            this.status("Sin conexión a internet");
+        } else if (!fbService.enabled || !fbService.currentUser) {
+            dot.classList.add("warning"); // Amarillo si hay internet pero no Firebase
+            if (!fbService.enabled) {
+                this.status("Error: Firebase no configurado.");
+            } else {
+                this.status("Conectando a Firebase...");
+            }
+        }
+        // Si está online y con usuario de Firebase, el punto será verde por defecto (sin clases extra)
+    },
     showBigAlert(title, code, type) { const el = document.getElementById("big-alert"); const box = document.getElementById("ba-box"); document.getElementById("ba-title").textContent = title; document.getElementById("ba-code").textContent = code; document.getElementById("ba-icon").textContent = type === "warning" ? "⚠️" : "ℹ️"; box.className = "ba-box " + type; el.classList.add("on"); if (navigator.vibrate) navigator.vibrate([100, 50, 100, 50, 200]); this.beep(200, 0.3) },
     onScan(raw) { if (this.isHandling) return; const now = Date.now(); if (raw === this.lastCode && now - this.lastAt < 1200) return; this.lastCode = raw; this.lastAt = now; this.isHandling = true; const n = logic.normalize(raw); let finalCode = logic.convert(n, this.mode); if (!finalCode) finalCode = n; if (!logic.validate(finalCode, this.mode)) { this.status(`Codigo invalido (${this.mode})`); this.feedback("error"); this.toast(`Formato invalido para ${this.mode}`, "warning"); this.pauseScannerTemporarily(800).finally(() => { this.isHandling = false }); return } const dup = this.scans.find(s => s.code_normalized === finalCode); if (dup) { this.status("Codigo duplicado"); this.feedback("warning"); this.showBigAlert("YA EXISTE", finalCode, "warning"); this.pauseScannerTemporarily(2000).finally(() => { this.isHandling = false }); return } this.tempScan = finalCode; if (this.batchMode) { this.confirm(this.batchLayout).finally(async () => { this.batchCount++; this.updateMetrics(); this.status(`Guardado en batch: ${finalCode}`); this.feedback("success"); await this.pauseScannerTemporarily(); this.isHandling = false }); return } this.confirm("QWERTY").finally(async () => { this.status(`Guardado: ${finalCode}`); this.feedback("success"); await this.pauseScannerTemporarily(); this.isHandling = false }) },
     async confirm(layout) { const r = { code_original: this.tempScan, code_normalized: this.tempScan, pi_mode: this.mode, layout, date: new Date().toISOString(), used: false, dateUsed: null, status: "pending" }; await db.addScan(r); await this.loadScans(); this.toast(`Guardado ${this.tempScan}`, "success") },

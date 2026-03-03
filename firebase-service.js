@@ -79,6 +79,7 @@ function unavailableResult() {
 export const fbService = {
     auth: runtime.auth,
     db: runtime.db,
+    enabled: runtime.enabled,
     currentUser: null,
 
     init(onUserChange) {
