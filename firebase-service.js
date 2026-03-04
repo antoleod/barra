@@ -38,7 +38,18 @@ async function tryGetJson(url) {
 }
 
 async function loadFirebaseConfig() {
-    const hostingConfig = await t 
+    const hostingConfig = await tryGetJson("/__/firebase/init.json");
+    if (hostingConfig) {
+        console.log("[firebase-service] Configuración de Hosting cargada.");
+        try { localStorage.setItem("firebase_config_cache", JSON.stringify(hostingConfig)); } catch (_) {}
+        return { ...hostingConfig, _source: 'live' };
+    }
+
+    // Si falla la red (offline), intentar cargar la configuración guardada previamente
+    try {
+        const cached = localStorage.getItem("firebase_config_cache");
+        if (cached) return { ...JSON.parse(cached), _source: 'cache' };
+    } catch (_) {}
 
     // --- CONFIGURACIÓN MANUAL DE RESPALDO ---
     // Rellena esto con los datos de tu proyecto desde la consola renucq
@@ -58,6 +69,7 @@ async function createFirebaseRuntime() {
     // Verificación de seguridad: Detectar si se usan las credenciales de ejemplo
     if (firebaseConfig.apiKey === "TU_API_KEY_AQUI") {
         console.error("[firebase-service] FALTA CONFIGURACIÓN: Reemplaza los valores en 'firebase-service.js' con los de tu proyecto Firebase.");
+        console.warn("Nota: El error 404 de init.json es normal en local. Debes poner tu API Key real arriba para que funcione.");
         return { app: null, auth: null, db: null, enabled: false };
     }
 
@@ -66,7 +78,7 @@ async function createFirebaseRuntime() {
     const db = initializeFirestore(app, {
         localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
     });
-    return { app, auth, db, enabled: true };
+    return { app, auth, db, enabled: true, configSource: firebaseConfig._source };
 }
 const runtime = await createFirebaseRuntime();
 
@@ -78,6 +90,7 @@ export const fbService = {
     auth: runtime.auth,
     db: runtime.db,
     enabled: runtime.enabled,
+    configSource: runtime.configSource,
     currentUser: null,
 
     init(onUserChange) {

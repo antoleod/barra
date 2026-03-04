@@ -46,7 +46,10 @@ self.addEventListener("fetch", (event) => {
 
   // Ignorar URLs reservadas de Firebase Hosting (init.json, auth handlers, etc.)
   const url = new URL(event.request.url);
-  if (url.pathname.startsWith("/__/")) return;
+  if (url.pathname.startsWith("/__/")) {
+    console.log("[SW] Passthrough (network only):", url.pathname);
+    return;
+  }
 
   event.respondWith(
     caches.match(event.request).then((cached) =>
