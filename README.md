@@ -1,108 +1,97 @@
-# Barra Scanner (PWA)
+# Barra Scanner (Mobile-first PWA)
 
-Barra Scanner is a mobile-first PWA for scanning codes with camera, image upload, and NFC, with local history + optional Firebase sync.
+Barra Scanner is a resilient scanner PWA with optional Firebase sync and autonomous auto-detection.
+
+## What was fixed (root causes)
+
+- Firebase init 404 handling:
+  - `/__/firebase/init.json` 404 is treated as expected on GitHub Pages.
+  - App automatically falls back to Local Mode.
+  - Sync actions are disabled gracefully in Local Mode.
+  - Added `Recheck Firebase` action in Settings.
+
+- Scanner concurrency:
+  - Added `scannerController.js` orchestration.
+  - Actions that require scanner idle (clear history, panel open, paste text, recheck Firebase, reset state) now stop scanner first, run action, then resume only when appropriate.
+
+- Loader and boot reliability:
+  - Boot state machine (`bootStatus`, `authStatus`, `persistenceMode`) updates UI chip state.
+  - Loader is always removed; shell is always shown (even on boot errors).
+
+- UI overlap/freeze prevention:
+  - Mobile-safe fixed header/footer layout retained.
+  - Panels close via X/backdrop/ESC.
+  - Scrollable panel content remains interactive.
+
+## Core modules
+
+- `app.js` main orchestrator
+- `scannerController.js` camera lifecycle + concurrency guard
+- `classify.js` deterministic auto-classification (PI / SN / QR)
+- `extract.js` structured field extraction from scanned/pasted payloads
+- `templatesStore.js` template persistence (local + optional Firebase)
+- `theme.js` theme manager (dark/light/eu_blue/custom accent)
+- `ui/layout.js` boot UI helpers
+- `firebase-service.js` optional Firebase runtime/auth/sync
+- `diagnostics.js` rolling diagnostics log (last 200)
 
 ## Features
 
-- Camera scan (`html5-qrcode`)
+- Camera scan
 - Image scan
 - NFC scan
-- Local history (IndexedDB)
-- CSV export
-- Clear local history
-- Service worker offline shell
-- Optional Firebase auth + Firestore sync
-- Scan Profiles:
-  - `pi_full`
-  - `pi_short`
-  - `sn_ritm`
-  - `sn_req`
-  - `sn_inc`
-  - `sn_sctask`
-  - `qr`
-  - `api`
-  - `test`
+- Paste ticket text + extraction
+- Auto Detect default mode
+- PI conversion rules preserved exactly
+- History with type badges
+- Export CSV (includes type/profile/structured fields)
+- Local history clear/reset UI state
+- Copy logs + Export logs JSON
+- Optional Firebase auth/sync
 
-## Run locally
+## Local mode
 
-1. Install a static server (example):
+If Firebase config is unavailable, the app works fully in Local Mode:
+- scanning + history + CSV export continue working
+- sync is disabled
+- status chip shows Local Mode
 
-```bash
-npm i -g serve
-```
+## Optional Firebase setup
 
-2. Start the app from repo root:
+The app tries config in this order:
+1. fresh cache (`firebase_config_cache`, <24h)
+2. `/__/firebase/init.json` (timeout 2000ms)
+3. stale cache fallback
+4. manual config from `firebase_manual_config` or `window.__FIREBASE_CONFIG__`
 
-```bash
-serve .
-```
+If all fail, Local Mode is used automatically.
 
-3. Open the local URL in your browser.
+## Auto Detect
 
-Notes:
-- On local servers, `/__/firebase/init.json` is usually unavailable.
-- The app will run in local-only mode if Firebase config is missing.
+Default profile is `AUTO`:
+- ServiceNow: `INC\d+`, `RITM\d+`, `REQ\d+`, `SCTASK\d+`
+- PI candidate detection via existing PI validator/converter logic
+- QR fallback for non-empty payloads
+
+Saved record includes resolved `type`, normalized value, and extracted structured fields.
+
+## Templates and extraction
+
+Templates are saved locally and optionally in Firebase:
+- id, name, type
+- regex rules
+- mapping rules
+- sample payloads
+
+Most-recent templates are applied first for extraction.
 
 ## Deploy to GitHub Pages
 
-1. Push the repository to GitHub.
-2. Enable Pages on the branch/folder containing this app.
-3. Ensure `index.html`, `app.js`, `firebase-service.js`, `sw.js`, `styles.css` are published.
-4. Open your Pages URL and verify scanner permissions on mobile.
+1. Push branch to GitHub.
+2. Enable Pages for repository/branch.
+3. Ensure static files are published from repo root.
+4. Validate camera permissions on mobile.
 
-## Firebase on GitHub Pages
+## CI/CD note
 
-Because GitHub Pages does not provide Firebase Hosting endpoint `/__/firebase/init.json`, configure Firebase manually:
-
-1. Create Firebase web app config in Firebase Console.
-2. Save it in localStorage key `firebase_manual_config` (JSON with `apiKey`, `authDomain`, `projectId`, `appId`, etc.), or inject `window.__FIREBASE_CONFIG__` before importing `firebase-service.js`.
-3. Optionally keep cache key `firebase_config_cache`.
-
-Config load order in `firebase-service.js`:
-
-1. Fresh cache (`firebase_config_cache`, < 24h)
-2. Live fetch `/__/firebase/init.json` with `AbortController` timeout = 2000ms
-3. Stale cache fallback
-4. Manual config (`firebase_manual_config` / `window.__FIREBASE_CONFIG__`)
-5. Local mode if none available
-
-## Scan Profiles
-
-Each scan profile defines:
-- `id`
-- `label`
-- `shortLabel`
-- `validate(raw)`
-- `normalize(raw)`
-- optional `apiAction(...)`
-
-Behavior:
-- PI profiles (`pi_full`, `pi_short`) use the original PI conversion logic unchanged.
-- ServiceNow profiles enforce strict ticket formats (`RITM#######`, `REQ#######`, `INC#######`, `SCTASK#######`).
-- QR accepts any non-empty value.
-- API profile can POST normalized value to configured endpoint and still saves locally.
-- Test profile supports synthetic scans for diagnostics.
-
-History includes profile/type badges and can filter by type.
-CSV export includes `Type` and `ProfileId` columns.
-
-## Local mode and auth
-
-- If Firebase is enabled and user is not authenticated, app redirects to `login.html`.
-- If Firebase is not enabled, app remains usable in local mode and sync buttons are disabled.
-- Loader is always dismissed after app boot; app should not stay on infinite loading.
-
-## Diagnostics
-
-A lightweight diagnostics logger stores recent app events in memory + localStorage (`barra_diag_logs`):
-- boot events
-- auth transitions
-- loader events
-- panel open/close
-- scanner start/stop
-- sync start/end/errors
-- API scan results
-
-Use Settings actions:
-- `Copy logs`
-- `Clear logs`
+The web app cannot push commits by itself. For auto-deploy, use GitHub Actions to deploy Pages on push.
