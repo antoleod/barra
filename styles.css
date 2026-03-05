@@ -137,6 +137,10 @@ body::after {
   overflow: hidden;
 }
 
+.app-shell.ready {
+  animation: fadeUp 0.2s ease both;
+}
+
 .app-header {
   position: absolute;
   top: 0;
@@ -551,7 +555,10 @@ body::after {
 
 .pc {
   padding: 12px 14px 20px;
-  overflow: auto;
+  overflow-y: auto;
+  max-height: calc(86vh - 68px);
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
 }
 
 .input,
@@ -650,6 +657,16 @@ body::after {
   background: rgba(var(--warn-rgb), 0.12);
 }
 
+.badge-type {
+  color: #b8f0ff;
+  background: rgba(var(--accent-rgb), 0.18);
+}
+
+.badge-profile {
+  color: #f2d7ff;
+  background: rgba(150, 120, 210, 0.22);
+}
+
 .badge-pending {
   color: #f9e2a0;
   background: rgba(var(--warn-rgb), 0.14);
@@ -725,6 +742,10 @@ body::after {
   color: color-mix(in srgb, var(--accent) 35%, white);
   background: rgba(var(--accent-rgb), 0.2);
   border: 1px solid rgba(var(--accent-rgb), 0.32);
+}
+
+.is-disabled {
+  opacity: 0.55;
 }
 
 .sw {

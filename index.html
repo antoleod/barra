@@ -49,9 +49,10 @@
       </section>
       <section class="status-wrap">
         <div class="status">
-          <div class="shead"><span id="mode-tag">FULL MODE</span><span id="offline" data-i18n="status_no_internet"
+          <div class="shead"><span id="mode-tag">PI FULL</span><span id="profile-tag" class="badge badge-profile">PI-F</span><span id="offline" data-i18n="status_no_internet"
               style="display:none;color:#ff9ca8;font-weight:700">NO CONNECTION</span></div>
           <div id="live" class="live" data-i18n="status_ready">Ready to scan</div>
+          <div id="firebase-mode" class="live" style="font-size:0.8rem;color:var(--muted);font-weight:600;">Checking Firebase...</div>
           <div class="metrics"><span class="m" id="m-total">0 records</span><span class="m" id="m-pending">0 pending</span><span class="m" id="m-batch">Batch off</span></div>
         </div>
       </section>
@@ -96,6 +97,9 @@
       <div class="title" data-i18n="header_history">History</div><button class="icon-btn" data-close="history">✕</button>
     </header>
     <div class="pc"><input id="search" class="input" placeholder="Search code" data-i18n-ph="ph_search" />
+      <select id="type-filter" class="select" style="margin-top:8px">
+        <option value="all">All Types</option>
+      </select>
       <div class="tabs"><button class="tab on" data-filter="all" data-i18n="tab_all">All</button><button class="tab"
           data-filter="pending" data-i18n="tab_pending">Pending</button><button class="tab" data-filter="sent" data-i18n="tab_sent">Sent</button></div>
       <ul id="log"></ul>
@@ -107,7 +111,11 @@
     </header>
     <div class="pc">
       <div style="margin-bottom:14px">
-        <label class="label">Modo de escaneo</label>
+        <label class="label">Scan Profile</label>
+        <select id="scan-profile-select" class="select"></select>
+      </div>
+      <div id="pi-mode-group" style="margin-bottom:14px">
+        <label class="label">PI Conversion Mode</label>
         <div class="seg">
           <button id="mode-full" class="mode on" type="button">FULL PI</button>
           <button id="mode-short" class="mode" type="button">SHORT</button>
@@ -133,6 +141,20 @@
         <input id="script-url" class="input" placeholder="https://script.google.com/.../exec" />
       </div>
       <div style="margin-bottom:14px">
+        <label class="label">API Scan</label>
+        <div class="row">
+          <span>Enable API post-process</span>
+          <label class="sw">
+            <input type="checkbox" id="api-enabled" />
+            <span class="sl"></span>
+          </label>
+        </div>
+        <input id="api-endpoint" class="input" placeholder="https://api.example.com/scan" />
+        <input id="api-token" class="input" placeholder="Bearer token (optional)" style="margin-top:8px" />
+        <input id="api-timeout" class="input" type="number" min="500" max="15000" step="100" placeholder="Timeout ms" style="margin-top:8px" />
+        <div id="api-response" style="margin-top:8px;font-size:0.78rem;color:var(--muted);min-height:18px;"></div>
+      </div>
+      <div style="margin-bottom:14px">
         <label class="label">Validacion</label>
         <div class="row">
           <span>OCR correction (O a 0)</span>
@@ -148,6 +170,10 @@
         <label class="label">Datos locales</label>
         <button id="export-btn" class="btn" style="width:100%;margin-bottom:8px">Exportar CSV</button>
         <button id="clear-btn" class="btn btn-danger" style="width:100%">Borrar historial local</button>
+        <button id="refresh-config-btn" class="btn" style="width:100%;margin-top:8px">Recargar Configuración</button>
+        <button id="test-scan-btn" class="btn" style="width:100%;margin-top:8px">Test scan (all profiles)</button>
+        <button id="copy-logs-btn" class="btn" style="width:100%;margin-top:8px">Copy logs</button>
+        <button id="clear-logs-btn" class="btn" style="width:100%;margin-top:8px">Clear logs</button>
       </div>
     </div>
   </section>
