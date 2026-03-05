@@ -1,5 +1,5 @@
 const LOG_KEY = "barra_diag_logs";
-const MAX_LOGS = 250;
+const MAX_LOGS = 200;
 
 function nowIso() {
   return new Date().toISOString();
@@ -80,6 +80,10 @@ class Diagnostics {
       const suffix = line.data ? ` ${JSON.stringify(line.data)}` : "";
       return `${line.ts} [${line.level.toUpperCase()}] ${line.event}${suffix}`;
     }).join("\n");
+  }
+
+  getJson() {
+    return JSON.stringify(this.logs, null, 2);
   }
 }
 

@@ -114,45 +114,22 @@
         <label class="label">Scan Profile</label>
         <select id="scan-profile-select" class="select"></select>
       </div>
+      <div style="margin-bottom:14px">
+        <label class="label">Auto Detect</label>
+        <div class="row">
+          <span>Detect type automatically</span>
+          <label class="sw">
+            <input type="checkbox" id="auto-detect-toggle" checked />
+            <span class="sl"></span>
+          </label>
+        </div>
+      </div>
       <div id="pi-mode-group" style="margin-bottom:14px">
         <label class="label">PI Conversion Mode</label>
         <div class="seg">
           <button id="mode-full" class="mode on" type="button">FULL PI</button>
           <button id="mode-short" class="mode" type="button">SHORT</button>
         </div>
-      </div>
-      <div style="margin-bottom:14px">
-        <label class="label">Batch</label>
-        <div class="row">
-          <span>Activar escaneo por lote</span>
-          <label class="sw">
-            <input type="checkbox" id="batch-toggle" />
-            <span class="sl"></span>
-          </label>
-        </div>
-        <select id="batch-layout" class="select" disabled>
-          <option value="QWERTY">QWERTY</option>
-          <option value="AZERTY">AZERTY</option>
-          <option value="QWERTZU">QWERTZU</option>
-        </select>
-      </div>
-      <div style="margin-bottom:14px">
-        <label class="label">Google Apps Script URL</label>
-        <input id="script-url" class="input" placeholder="https://script.google.com/.../exec" />
-      </div>
-      <div style="margin-bottom:14px">
-        <label class="label">API Scan</label>
-        <div class="row">
-          <span>Enable API post-process</span>
-          <label class="sw">
-            <input type="checkbox" id="api-enabled" />
-            <span class="sl"></span>
-          </label>
-        </div>
-        <input id="api-endpoint" class="input" placeholder="https://api.example.com/scan" />
-        <input id="api-token" class="input" placeholder="Bearer token (optional)" style="margin-top:8px" />
-        <input id="api-timeout" class="input" type="number" min="500" max="15000" step="100" placeholder="Timeout ms" style="margin-top:8px" />
-        <div id="api-response" style="margin-top:8px;font-size:0.78rem;color:var(--muted);min-height:18px;"></div>
       </div>
       <div style="margin-bottom:14px">
         <label class="label">Validacion</label>
@@ -166,13 +143,28 @@
         <input id="full-prefix" class="input" placeholder="Full prefix" />
         <input id="short-prefix" class="input" placeholder="Short prefix" style="margin-top:8px" />
       </div>
+      <div style="margin-bottom:14px">
+        <label class="label">ServiceNow</label>
+        <input id="sn-base-url" class="input" placeholder="https://instance.service-now.com/nav_to.do?uri=..." />
+      </div>
+      <div style="margin-bottom:14px">
+        <label class="label">Theme</label>
+        <select id="theme-select" class="select">
+          <option value="dark">Dark</option>
+          <option value="light">Light</option>
+          <option value="eu_blue">EU Blue</option>
+        </select>
+        <input id="accent-color" class="input" type="color" style="margin-top:8px;padding:6px;height:44px" />
+      </div>
       <div>
-        <label class="label">Datos locales</label>
-        <button id="export-btn" class="btn" style="width:100%;margin-bottom:8px">Exportar CSV</button>
-        <button id="clear-btn" class="btn btn-danger" style="width:100%">Borrar historial local</button>
-        <button id="refresh-config-btn" class="btn" style="width:100%;margin-top:8px">Recargar Configuración</button>
-        <button id="test-scan-btn" class="btn" style="width:100%;margin-top:8px">Test scan (all profiles)</button>
+        <label class="label">Actions</label>
+        <button id="recheck-firebase-btn" class="btn" style="width:100%;margin-bottom:8px">Recheck Firebase</button>
+        <button id="paste-ticket-btn" class="btn" style="width:100%;margin-bottom:8px">Paste ticket text</button>
+        <button id="export-btn" class="btn" style="width:100%;margin-bottom:8px">Export CSV</button>
+        <button id="clear-btn" class="btn btn-danger" style="width:100%;margin-bottom:8px">Clear local history</button>
+        <button id="reset-state-btn" class="btn" style="width:100%;margin-bottom:8px">Reset app state</button>
         <button id="copy-logs-btn" class="btn" style="width:100%;margin-top:8px">Copy logs</button>
+        <button id="export-logs-btn" class="btn" style="width:100%;margin-top:8px">Export logs JSON</button>
         <button id="clear-logs-btn" class="btn" style="width:100%;margin-top:8px">Clear logs</button>
       </div>
     </div>

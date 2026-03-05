@@ -55,7 +55,11 @@ async function fetchJsonWithTimeout(url, timeoutMs = INIT_TIMEOUT_MS) {
       signal: controller.signal,
     });
     if (!response.ok) {
-      diag.warn("firebase.config.fetch_not_ok", { status: response.status, url });
+      if (response.status === 404) {
+        diag.info("firebase.config.not_found_expected", { url, status: 404 });
+      } else {
+        diag.warn("firebase.config.fetch_not_ok", { status: response.status, url });
+      }
       return null;
     }
     const contentType = response.headers.get("content-type") || "";
@@ -397,5 +401,12 @@ export const fbService = {
       return email.replace(FAKE_DOMAIN, "").toUpperCase();
     }
     return this.currentUser.displayName || email;
+  },
+
+  async recheckConfig() {
+    runtimePromise = null;
+    const runtime = await this._ensureReady();
+    diag.info("firebase.recheck", { enabled: runtime.enabled, source: runtime.configSource });
+    return { enabled: runtime.enabled, source: runtime.configSource };
   },
 };
