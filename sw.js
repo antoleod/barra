@@ -5,6 +5,8 @@ const CORE = [
   "./login.html",
   "./styles.css",
   "./app.js",
+  "./diagnostics.js",
+  "./scan-profiles.js",
   "./login.js",
   "./firebase-service.js",
   "./manifest.webmanifest",

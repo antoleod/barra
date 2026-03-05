@@ -106,6 +106,12 @@ async function main() {
     try {
         const user = await fbService.getInitialUser();
 
+        if (!fbService.enabled) {
+            setStatus("Firebase not configured. Redirecting to local mode...", "info");
+            setTimeout(() => window.location.replace('./index.html'), 500);
+            return;
+        }
+
         if (user) {
             // User is already logged in, redirect to the main app.
             setStatus("Session found. Redirecting...", "success");
