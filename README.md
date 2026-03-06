@@ -1,97 +1,51 @@
-# Barra Scanner (Mobile-first PWA)
+﻿# Barra Scanner - React Native + Expo + TypeScript
 
-Barra Scanner is a resilient scanner PWA with optional Firebase sync and autonomous auto-detection.
+Este repositorio fue migrado a una app móvil con Expo y TypeScript.
 
-## What was fixed (root causes)
+## Proyecto activo
 
-- Firebase init 404 handling:
-  - `/__/firebase/init.json` 404 is treated as expected on GitHub Pages.
-  - App automatically falls back to Local Mode.
-  - Sync actions are disabled gracefully in Local Mode.
-  - Added `Recheck Firebase` action in Settings.
+- `mobile/` contiene toda la app nueva.
+- Los archivos web legacy fueron eliminados.
 
-- Scanner concurrency:
-  - Added `scannerController.js` orchestration.
-  - Actions that require scanner idle (clear history, panel open, paste text, recheck Firebase, reset state) now stop scanner first, run action, then resume only when appropriate.
+## Stack
 
-- Loader and boot reliability:
-  - Boot state machine (`bootStatus`, `authStatus`, `persistenceMode`) updates UI chip state.
-  - Loader is always removed; shell is always shown (even on boot errors).
+- Expo SDK 55
+- React Native
+- TypeScript
+- AsyncStorage (historial, settings, templates, logs)
+- expo-camera (escaneo cámara + scan desde imagen)
 
-- UI overlap/freeze prevention:
-  - Mobile-safe fixed header/footer layout retained.
-  - Panels close via X/backdrop/ESC.
-  - Scrollable panel content remains interactive.
+## Funcionalidad migrada
 
-## Core modules
+- Escaneo por cámara
+- Escaneo de imagen
+- Historial local
+- Export CSV
+- Limpieza de historial
+- Diagnósticos (copy/export)
+- Auto Detect por reglas (PI, RITM, REQ, INC, SCTASK, QR)
+- Extracción estructurada por regex + plantillas
+- Theme selector (dark/light/eu_blue + accent)
 
-- `app.js` main orchestrator
-- `scannerController.js` camera lifecycle + concurrency guard
-- `classify.js` deterministic auto-classification (PI / SN / QR)
-- `extract.js` structured field extraction from scanned/pasted payloads
-- `templatesStore.js` template persistence (local + optional Firebase)
-- `theme.js` theme manager (dark/light/eu_blue/custom accent)
-- `ui/layout.js` boot UI helpers
-- `firebase-service.js` optional Firebase runtime/auth/sync
-- `diagnostics.js` rolling diagnostics log (last 200)
+## PI logic
 
-## Features
+La lógica PI se mantuvo idéntica en comportamiento para FULL/SHORT.
 
-- Camera scan
-- Image scan
-- NFC scan
-- Paste ticket text + extraction
-- Auto Detect default mode
-- PI conversion rules preserved exactly
-- History with type badges
-- Export CSV (includes type/profile/structured fields)
-- Local history clear/reset UI state
-- Copy logs + Export logs JSON
-- Optional Firebase auth/sync
+Archivo:
+- `mobile/src/core/settings.ts` (`piLogic.normalize/convert/validate`)
 
-## Local mode
+## Ejecutar
 
-If Firebase config is unavailable, the app works fully in Local Mode:
-- scanning + history + CSV export continue working
-- sync is disabled
-- status chip shows Local Mode
+```bash
+cd mobile
+npm install
+npm run start
+```
 
-## Optional Firebase setup
+Luego abrir en Expo Go / emulador.
 
-The app tries config in this order:
-1. fresh cache (`firebase_config_cache`, <24h)
-2. `/__/firebase/init.json` (timeout 2000ms)
-3. stale cache fallback
-4. manual config from `firebase_manual_config` or `window.__FIREBASE_CONFIG__`
+## Notas
 
-If all fail, Local Mode is used automatically.
-
-## Auto Detect
-
-Default profile is `AUTO`:
-- ServiceNow: `INC\d+`, `RITM\d+`, `REQ\d+`, `SCTASK\d+`
-- PI candidate detection via existing PI validator/converter logic
-- QR fallback for non-empty payloads
-
-Saved record includes resolved `type`, normalized value, and extracted structured fields.
-
-## Templates and extraction
-
-Templates are saved locally and optionally in Firebase:
-- id, name, type
-- regex rules
-- mapping rules
-- sample payloads
-
-Most-recent templates are applied first for extraction.
-
-## Deploy to GitHub Pages
-
-1. Push branch to GitHub.
-2. Enable Pages for repository/branch.
-3. Ensure static files are published from repo root.
-4. Validate camera permissions on mobile.
-
-## CI/CD note
-
-The web app cannot push commits by itself. For auto-deploy, use GitHub Actions to deploy Pages on push.
+- Modo por defecto: local-first.
+- NFC no está habilitado por defecto en Expo managed (requiere librería nativa/configuración adicional).
+- Si quieres, en el siguiente paso conecto Firebase en RN (Auth + Firestore) y agrego sync real en mobile.
