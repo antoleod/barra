@@ -16,6 +16,7 @@ import * as ImagePicker from 'expo-image-picker';
 import * as Clipboard from 'expo-clipboard';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
+import type { User } from 'firebase/auth';
 
 import { AppSettings, AuthStatus, BootStatus, PersistenceMode, ScanRecord, TemplateRule } from './src/types';
 import { defaultSettings, loadSettings, piLogic, saveSettings } from './src/core/settings';
@@ -25,6 +26,13 @@ import { addHistory, clearHistory, loadHistory, saveHistory } from './src/core/h
 import { loadTemplates, saveTemplate } from './src/core/templates';
 import { diag } from './src/core/diagnostics';
 import { themes, ThemeName } from './src/theme/theme';
+import {
+  initFirebaseRuntime,
+  loginWithEmail,
+  logoutFirebase,
+  onFirebaseAuthState,
+  syncScansWithFirebase,
+} from './src/core/firebase';
 
 type Tab = 'scan' | 'history' | 'settings';
 
@@ -39,6 +47,10 @@ export default function App() {
   const [query, setQuery] = useState('');
   const [lastScanAt, setLastScanAt] = useState(0);
   const [pasteText, setPasteText] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [firebaseUser, setFirebaseUser] = useState<User | null>(null);
+  const [firebaseConfigured, setFirebaseConfigured] = useState(false);
   const [cameraPermission, requestCameraPermission] = useCameraPermissions();
 
   const palette = useMemo(() => {
@@ -57,15 +69,33 @@ export default function App() {
         setSettings(loadedSettings);
         setHistory(loadedHistory);
         setTemplates(loadedTemplates);
-        setPersistenceMode('local');
-        setAuthStatus('guest');
-        await diag.info('boot.ready', { mode: 'local' });
+
+        const rt = await initFirebaseRuntime();
+        setFirebaseConfigured(rt.enabled);
+        setPersistenceMode(rt.enabled ? 'firebase' : 'local');
+        setAuthStatus(rt.enabled ? 'unknown' : 'guest');
+
+        await diag.info('boot.ready', { mode: rt.enabled ? 'firebase' : 'local' });
         setBootStatus('ready');
       } catch (error) {
         await diag.error('boot.error', { message: String(error) });
         setBootStatus('error');
       }
     })();
+  }, []);
+
+  useEffect(() => {
+    let unsubscribe: (() => void) | undefined;
+    (async () => {
+      unsubscribe = await onFirebaseAuthState((user) => {
+        setFirebaseUser(user as User | null);
+        setAuthStatus(user ? 'authenticated' : 'guest');
+      });
+    })();
+
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
   }, []);
 
   async function patchSettings(next: Partial<AppSettings>) {
@@ -169,6 +199,45 @@ export default function App() {
     await Sharing.shareAsync(path, { mimeType: 'application/json' });
   }
 
+  async function doFirebaseLogin() {
+    try {
+      const user = await loginWithEmail(email, password);
+      setFirebaseUser(user);
+      setAuthStatus('authenticated');
+      await diag.info('firebase.login.ok', { uid: user.uid });
+      Alert.alert('Firebase', 'Login correcto');
+    } catch (error) {
+      await diag.error('firebase.login.error', { message: String(error) });
+      Alert.alert('Firebase login error', String(error));
+    }
+  }
+
+  async function doFirebaseLogout() {
+    await logoutFirebase();
+    setFirebaseUser(null);
+    setAuthStatus('guest');
+  }
+
+  async function syncNow() {
+    try {
+      const result = await syncScansWithFirebase(history);
+      const localKeys = new Set(history.map((x) => `${x.type}::${x.codeNormalized}`));
+      const merged = [...history];
+      for (const scan of result.server) {
+        const key = `${scan.type}::${scan.codeNormalized}`;
+        if (!localKeys.has(key)) merged.push(scan);
+      }
+      const marked = merged.map((x) => ({ ...x, status: 'sent' as const }));
+      setHistory(marked);
+      await saveHistory(marked);
+      await diag.info('firebase.sync.ok', { pushed: result.pushed, total: marked.length });
+      Alert.alert('Sync', `OK. pushed=${result.pushed}, total=${marked.length}`);
+    } catch (error) {
+      await diag.error('firebase.sync.error', { message: String(error) });
+      Alert.alert('Sync error', String(error));
+    }
+  }
+
   async function clearAllHistory() {
     Alert.alert('Confirmar', 'Borrar historial local?', [
       { text: 'Cancelar', style: 'cancel' },
@@ -210,7 +279,11 @@ export default function App() {
     );
   }
 
-  const statusChip = persistenceMode === 'local' ? 'Local mode' : authStatus === 'authenticated' ? 'Firebase' : 'Guest';
+  const statusChip = persistenceMode === 'local'
+    ? 'Local mode'
+    : authStatus === 'authenticated'
+      ? `Firebase (${firebaseUser?.email || 'user'})`
+      : 'Firebase guest';
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: palette.bg }]}> 
@@ -322,6 +395,51 @@ export default function App() {
                 <Pressable style={[styles.smallBtn, { borderColor: palette.border }]} onPress={copyLogs}><Text style={{ color: palette.fg }}>Copy logs</Text></Pressable>
                 <Pressable style={[styles.smallBtn, { borderColor: palette.border }]} onPress={exportLogs}><Text style={{ color: palette.fg }}>Export logs</Text></Pressable>
               </View>
+
+              <Text style={[styles.sectionTitle, { color: palette.fg, marginTop: 12 }]}>Firebase</Text>
+              {!firebaseConfigured ? (
+                <Text style={{ color: palette.muted, marginTop: 6 }}>
+                  No configurado. Define EXPO_PUBLIC_FIREBASE_* para habilitar sync cloud.
+                </Text>
+              ) : (
+                <>
+                  <TextInput
+                    value={email}
+                    onChangeText={setEmail}
+                    placeholder="email"
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                    placeholderTextColor={palette.muted}
+                    style={[styles.input, { color: palette.fg, borderColor: palette.border, backgroundColor: palette.bg }]}
+                  />
+                  <TextInput
+                    value={password}
+                    onChangeText={setPassword}
+                    placeholder="password"
+                    secureTextEntry
+                    placeholderTextColor={palette.muted}
+                    style={[styles.input, { color: palette.fg, borderColor: palette.border, backgroundColor: palette.bg }]}
+                  />
+                  <View style={styles.rowButtons}>
+                    {authStatus !== 'authenticated' ? (
+                      <Pressable style={[styles.smallBtn, { borderColor: palette.border }]} onPress={doFirebaseLogin}>
+                        <Text style={{ color: palette.fg }}>Login/Create</Text>
+                      </Pressable>
+                    ) : (
+                      <Pressable style={[styles.smallBtn, { borderColor: palette.border }]} onPress={doFirebaseLogout}>
+                        <Text style={{ color: palette.fg }}>Logout</Text>
+                      </Pressable>
+                    )}
+                    <Pressable
+                      style={[styles.smallBtn, { borderColor: palette.border, opacity: authStatus === 'authenticated' ? 1 : 0.5 }]}
+                      disabled={authStatus !== 'authenticated'}
+                      onPress={syncNow}
+                    >
+                      <Text style={{ color: palette.fg }}>Sync now</Text>
+                    </Pressable>
+                  </View>
+                </>
+              )}
             </View>
           </View>
         )}
@@ -367,4 +485,3 @@ const styles = StyleSheet.create({
   footer: { borderTopWidth: 1, paddingHorizontal: 8, paddingVertical: 8, flexDirection: 'row' },
   footerBtn: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 8 },
 });
-

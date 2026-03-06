@@ -1,38 +1,41 @@
 ﻿# Barra Scanner - React Native + Expo + TypeScript
 
-Este repositorio fue migrado a una app móvil con Expo y TypeScript.
+Proyecto migrado a app móvil con Expo + TypeScript.
 
-## Proyecto activo
+## Estructura
 
-- `mobile/` contiene toda la app nueva.
-- Los archivos web legacy fueron eliminados.
+- `mobile/` app activa
+- legacy web eliminado
 
-## Stack
+## Funcionalidad
 
-- Expo SDK 55
-- React Native
-- TypeScript
-- AsyncStorage (historial, settings, templates, logs)
-- expo-camera (escaneo cámara + scan desde imagen)
-
-## Funcionalidad migrada
-
-- Escaneo por cámara
-- Escaneo de imagen
+- Camera scan
+- Image scan
+- Auto detect (PI / RITM / REQ / INC / SCTASK / QR)
+- Extracción estructurada por regex + templates
 - Historial local
 - Export CSV
-- Limpieza de historial
-- Diagnósticos (copy/export)
-- Auto Detect por reglas (PI, RITM, REQ, INC, SCTASK, QR)
-- Extracción estructurada por regex + plantillas
-- Theme selector (dark/light/eu_blue + accent)
+- Logs copy/export JSON
+- Theme selector
 
 ## PI logic
 
-La lógica PI se mantuvo idéntica en comportamiento para FULL/SHORT.
+La lógica PI (FULL/SHORT) conserva comportamiento idéntico en:
 
-Archivo:
 - `mobile/src/core/settings.ts` (`piLogic.normalize/convert/validate`)
+
+## Firebase (opcional) en React Native
+
+Si defines estas variables de entorno, se habilita Auth + Firestore sync:
+
+- `EXPO_PUBLIC_FIREBASE_API_KEY`
+- `EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN`
+- `EXPO_PUBLIC_FIREBASE_PROJECT_ID`
+- `EXPO_PUBLIC_FIREBASE_APP_ID`
+- `EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET` (opcional)
+- `EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID` (opcional)
+
+Sin estas variables la app cae automáticamente a Local Mode.
 
 ## Ejecutar
 
@@ -42,10 +45,9 @@ npm install
 npm run start
 ```
 
-Luego abrir en Expo Go / emulador.
+## Verificación
 
-## Notas
-
-- Modo por defecto: local-first.
-- NFC no está habilitado por defecto en Expo managed (requiere librería nativa/configuración adicional).
-- Si quieres, en el siguiente paso conecto Firebase en RN (Auth + Firestore) y agrego sync real en mobile.
+```bash
+cd mobile
+npx tsc --noEmit
+```
