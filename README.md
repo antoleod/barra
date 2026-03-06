@@ -35,7 +35,23 @@ Si defines estas variables de entorno, se habilita Auth + Firestore sync:
 - `EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET` (opcional)
 - `EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID` (opcional)
 
+Tienes plantilla en:
+
+- `mobile/.env.example`
+
+Puedes crear:
+
+```bash
+cp mobile/.env.example mobile/.env
+```
+
+Luego completar valores.
+
 Sin estas variables la app cae automáticamente a Local Mode.
+
+Configuracion Expo:
+
+- `mobile/app.config.ts` centraliza la config del proyecto y detecta si Firebase está configurado.
 
 ## Ejecutar
 
@@ -51,3 +67,10 @@ npm run start
 cd mobile
 npx tsc --noEmit
 ```
+
+Mejoras aplicadas recientemente:
+
+- guardas de concurrencia para scan/login/sync
+- anti-duplicado temporal por payload escaneado
+- recheck manual de Firebase desde UI
+- sync más seguro (solo marca `pending` locales como `sent`)

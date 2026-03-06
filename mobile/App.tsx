@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useState } from 'react';
+﻿import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   FlatList,
@@ -31,6 +31,7 @@ import {
   loginWithEmail,
   logoutFirebase,
   onFirebaseAuthState,
+  recheckFirebaseRuntime,
   syncScansWithFirebase,
 } from './src/core/firebase';
 
@@ -47,10 +48,17 @@ export default function App() {
   const [query, setQuery] = useState('');
   const [lastScanAt, setLastScanAt] = useState(0);
   const [pasteText, setPasteText] = useState('');
+
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [firebaseUser, setFirebaseUser] = useState<User | null>(null);
   const [firebaseConfigured, setFirebaseConfigured] = useState(false);
+  const [authBusy, setAuthBusy] = useState(false);
+  const [syncBusy, setSyncBusy] = useState(false);
+
+  const scanBusyRef = useRef(false);
+  const lastPayloadRef = useRef<{ value: string; ts: number }>({ value: '', ts: 0 });
+
   const [cameraPermission, requestCameraPermission] = useCameraPermissions();
 
   const palette = useMemo(() => {
@@ -92,7 +100,6 @@ export default function App() {
         setAuthStatus(user ? 'authenticated' : 'guest');
       });
     })();
-
     return () => {
       if (unsubscribe) unsubscribe();
     };
@@ -118,42 +125,55 @@ export default function App() {
   }
 
   async function persistScan(raw: string, source: ScanRecord['source']) {
-    const now = Date.now();
-    if (now - lastScanAt < 1000) return;
-    setLastScanAt(now);
+    if (scanBusyRef.current) return;
+    scanBusyRef.current = true;
 
-    const classified = classifyAndNormalize(raw);
-    if (!classified.normalized) return;
+    try {
+      const payload = String(raw || '').trim();
+      if (!payload) return;
 
-    if (classified.type === 'PI' && !piLogic.validate(classified.normalized, classified.piMode === 'SHORT' ? 'SHORT' : 'FULL', settings)) {
-      Alert.alert('Formato invalido', 'No pasa validacion PI.');
-      return;
+      const now = Date.now();
+      if (lastPayloadRef.current.value === payload && now - lastPayloadRef.current.ts < 1200) return;
+      lastPayloadRef.current = { value: payload, ts: now };
+
+      if (now - lastScanAt < 1000) return;
+      setLastScanAt(now);
+
+      const classified = classifyAndNormalize(payload);
+      if (!classified.normalized) return;
+
+      if (classified.type === 'PI' && !piLogic.validate(classified.normalized, classified.piMode === 'SHORT' ? 'SHORT' : 'FULL', settings)) {
+        Alert.alert('Formato invalido', 'No pasa validacion PI.');
+        return;
+      }
+
+      if (history.some((x) => x.codeNormalized === classified.normalized && x.type === classified.type)) {
+        Alert.alert('Duplicado', classified.normalized);
+        return;
+      }
+
+      const fields = extractFields(payload, templates);
+      const record: ScanRecord = {
+        id: `scan_${Date.now()}`,
+        codeOriginal: payload,
+        codeNormalized: classified.normalized,
+        type: classified.type,
+        profileId: classified.profileId,
+        piMode: classified.piMode,
+        source,
+        structuredFields: fields,
+        date: new Date().toISOString(),
+        status: 'pending',
+        used: false,
+        dateUsed: null,
+      };
+
+      const next = await addHistory(record);
+      setHistory(next);
+      await diag.info('scan.saved', { type: record.type, source: record.source });
+    } finally {
+      scanBusyRef.current = false;
     }
-
-    if (history.some((x) => x.codeNormalized === classified.normalized && x.type === classified.type)) {
-      Alert.alert('Duplicado', classified.normalized);
-      return;
-    }
-
-    const fields = extractFields(raw, templates);
-    const record: ScanRecord = {
-      id: `scan_${Date.now()}`,
-      codeOriginal: raw,
-      codeNormalized: classified.normalized,
-      type: classified.type,
-      profileId: classified.profileId,
-      piMode: classified.piMode,
-      source,
-      structuredFields: fields,
-      date: new Date().toISOString(),
-      status: 'pending',
-      used: false,
-      dateUsed: null,
-    };
-
-    const next = await addHistory(record);
-    setHistory(next);
-    await diag.info('scan.saved', { type: record.type, source: record.source });
   }
 
   async function onBarCodeScanned(data: string) {
@@ -200,6 +220,13 @@ export default function App() {
   }
 
   async function doFirebaseLogin() {
+    if (authBusy) return;
+    if (!email.trim() || !password.trim()) {
+      Alert.alert('Firebase', 'Email y password son requeridos');
+      return;
+    }
+
+    setAuthBusy(true);
     try {
       const user = await loginWithEmail(email, password);
       setFirebaseUser(user);
@@ -209,32 +236,55 @@ export default function App() {
     } catch (error) {
       await diag.error('firebase.login.error', { message: String(error) });
       Alert.alert('Firebase login error', String(error));
+    } finally {
+      setAuthBusy(false);
     }
   }
 
   async function doFirebaseLogout() {
-    await logoutFirebase();
-    setFirebaseUser(null);
-    setAuthStatus('guest');
+    if (authBusy) return;
+    setAuthBusy(true);
+    try {
+      await logoutFirebase();
+      setFirebaseUser(null);
+      setAuthStatus('guest');
+    } finally {
+      setAuthBusy(false);
+    }
+  }
+
+  async function recheckFirebase() {
+    try {
+      const rt = await recheckFirebaseRuntime();
+      setFirebaseConfigured(rt.enabled);
+      setPersistenceMode(rt.enabled ? 'firebase' : 'local');
+      Alert.alert('Firebase', rt.enabled ? 'Configuracion detectada' : 'Sin configuracion, modo local');
+    } catch (error) {
+      Alert.alert('Firebase', `Error recheck: ${String(error)}`);
+    }
   }
 
   async function syncNow() {
+    if (syncBusy || authStatus !== 'authenticated') return;
+
+    setSyncBusy(true);
     try {
       const result = await syncScansWithFirebase(history);
       const localKeys = new Set(history.map((x) => `${x.type}::${x.codeNormalized}`));
-      const merged = [...history];
+      const merged = history.map((x) => (x.status === 'pending' ? { ...x, status: 'sent' as const } : x));
       for (const scan of result.server) {
         const key = `${scan.type}::${scan.codeNormalized}`;
         if (!localKeys.has(key)) merged.push(scan);
       }
-      const marked = merged.map((x) => ({ ...x, status: 'sent' as const }));
-      setHistory(marked);
-      await saveHistory(marked);
-      await diag.info('firebase.sync.ok', { pushed: result.pushed, total: marked.length });
-      Alert.alert('Sync', `OK. pushed=${result.pushed}, total=${marked.length}`);
+      setHistory(merged);
+      await saveHistory(merged);
+      await diag.info('firebase.sync.ok', { pushed: result.pushed, total: merged.length });
+      Alert.alert('Sync', `OK. pushed=${result.pushed}, total=${merged.length}`);
     } catch (error) {
       await diag.error('firebase.sync.error', { message: String(error) });
       Alert.alert('Sync error', String(error));
+    } finally {
+      setSyncBusy(false);
     }
   }
 
@@ -398,9 +448,16 @@ export default function App() {
 
               <Text style={[styles.sectionTitle, { color: palette.fg, marginTop: 12 }]}>Firebase</Text>
               {!firebaseConfigured ? (
-                <Text style={{ color: palette.muted, marginTop: 6 }}>
-                  No configurado. Define EXPO_PUBLIC_FIREBASE_* para habilitar sync cloud.
-                </Text>
+                <>
+                  <Text style={{ color: palette.muted, marginTop: 6 }}>
+                    No configurado. Define EXPO_PUBLIC_FIREBASE_* para habilitar sync cloud.
+                  </Text>
+                  <View style={styles.rowButtons}>
+                    <Pressable style={[styles.smallBtn, { borderColor: palette.border }]} onPress={recheckFirebase}>
+                      <Text style={{ color: palette.fg }}>Recheck</Text>
+                    </Pressable>
+                  </View>
+                </>
               ) : (
                 <>
                   <TextInput
@@ -422,20 +479,23 @@ export default function App() {
                   />
                   <View style={styles.rowButtons}>
                     {authStatus !== 'authenticated' ? (
-                      <Pressable style={[styles.smallBtn, { borderColor: palette.border }]} onPress={doFirebaseLogin}>
-                        <Text style={{ color: palette.fg }}>Login/Create</Text>
+                      <Pressable style={[styles.smallBtn, { borderColor: palette.border, opacity: authBusy ? 0.6 : 1 }]} onPress={doFirebaseLogin} disabled={authBusy}>
+                        <Text style={{ color: palette.fg }}>{authBusy ? 'Working...' : 'Login/Create'}</Text>
                       </Pressable>
                     ) : (
-                      <Pressable style={[styles.smallBtn, { borderColor: palette.border }]} onPress={doFirebaseLogout}>
-                        <Text style={{ color: palette.fg }}>Logout</Text>
+                      <Pressable style={[styles.smallBtn, { borderColor: palette.border, opacity: authBusy ? 0.6 : 1 }]} onPress={doFirebaseLogout} disabled={authBusy}>
+                        <Text style={{ color: palette.fg }}>{authBusy ? 'Working...' : 'Logout'}</Text>
                       </Pressable>
                     )}
                     <Pressable
-                      style={[styles.smallBtn, { borderColor: palette.border, opacity: authStatus === 'authenticated' ? 1 : 0.5 }]}
-                      disabled={authStatus !== 'authenticated'}
+                      style={[styles.smallBtn, { borderColor: palette.border, opacity: authStatus === 'authenticated' && !syncBusy ? 1 : 0.5 }]}
+                      disabled={authStatus !== 'authenticated' || syncBusy}
                       onPress={syncNow}
                     >
-                      <Text style={{ color: palette.fg }}>Sync now</Text>
+                      <Text style={{ color: palette.fg }}>{syncBusy ? 'Syncing...' : 'Sync now'}</Text>
+                    </Pressable>
+                    <Pressable style={[styles.smallBtn, { borderColor: palette.border }]} onPress={recheckFirebase}>
+                      <Text style={{ color: palette.fg }}>Recheck</Text>
                     </Pressable>
                   </View>
                 </>

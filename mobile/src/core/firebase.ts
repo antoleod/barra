@@ -61,6 +61,11 @@ export async function initFirebaseRuntime(): Promise<FirebaseRuntime> {
   return runtime;
 }
 
+export async function recheckFirebaseRuntime(): Promise<FirebaseRuntime> {
+  runtime = null;
+  return initFirebaseRuntime();
+}
+
 export async function onFirebaseAuthState(cb: (user: Auth['currentUser']) => void) {
   const rt = await initFirebaseRuntime();
   if (!rt.enabled || !rt.auth) {
