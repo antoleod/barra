@@ -1,0 +1,22 @@
+{
+  "compilerOptions": {
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "target": "es2020",
+    "outDir": ".test-dist",
+    "rootDir": ".",
+    "noEmit": false,
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "declaration": false,
+    "sourceMap": false
+  },
+  "include": [
+    "tests/run-tests.ts",
+    "src/core/classify.ts",
+    "src/core/extract.ts",
+    "src/core/settings.ts",
+    "src/types.ts"
+  ]
+}

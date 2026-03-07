@@ -34,6 +34,7 @@ Si defines estas variables de entorno, se habilita Auth + Firestore sync:
 - `EXPO_PUBLIC_FIREBASE_APP_ID`
 - `EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET` (opcional)
 - `EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID` (opcional)
+- `EXPO_PUBLIC_ENABLE_UPDATES` (`false` por defecto para evitar errores OTA en builds sin canal de updates)
 
 Tienes plantilla en:
 
@@ -65,7 +66,8 @@ npm run start
 
 ```bash
 cd mobile
-npx tsc --noEmit
+npm run typecheck
+npm test
 ```
 
 Mejoras aplicadas recientemente:

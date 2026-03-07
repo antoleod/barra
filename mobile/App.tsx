@@ -1,21 +1,27 @@
-﻿import { useEffect, useMemo, useRef, useState } from 'react';
+﻿﻿import React from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   FlatList,
+  KeyboardAvoidingView,
+  Platform,
   Pressable,
+  ScrollView,
   StatusBar,
   StyleSheet,
   Switch,
   Text,
   TextInput,
+  useWindowDimensions,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { CameraView, Camera, useCameraPermissions } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
 import * as Clipboard from 'expo-clipboard';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import type { User } from 'firebase/auth';
 
 import { AppSettings, AuthStatus, BootStatus, PersistenceMode, ScanRecord, TemplateRule } from './src/types';
@@ -37,7 +43,59 @@ import {
 
 type Tab = 'scan' | 'history' | 'settings';
 
+function LogoMark({ accent, foreground, compact }: { accent: string; foreground: string; compact?: boolean }) {
+  const size = compact ? 44 : 52;
+  const lineHeight = compact ? 18 : 22;
+  return (
+    <View style={[styles.logoShell, { width: size, height: size, borderColor: accent }]}>
+      <View style={[styles.logoHalo, { backgroundColor: accent + '22' }]} />
+      <View style={[styles.logoCore, { backgroundColor: accent }]}>
+        <View style={styles.logoBars}>
+          <View style={[styles.logoBar, { height: lineHeight, backgroundColor: foreground }]} />
+          <View style={[styles.logoBarThin, { height: lineHeight - 4, backgroundColor: foreground }]} />
+          <View style={[styles.logoBar, { height: lineHeight + 2, backgroundColor: foreground }]} />
+          <View style={[styles.logoBarThin, { height: lineHeight - 2, backgroundColor: foreground }]} />
+        </View>
+      </View>
+    </View>
+  );
+}
+
+class SimpleErrorBoundary extends React.Component<{ children: React.ReactNode }, { error: Error | null }> {
+  constructor(props: { children: React.ReactNode }) {
+    super(props);
+    this.state = { error: null };
+  }
+
+  static getDerivedStateFromError(error: Error) {
+    return { error };
+  }
+
+  componentDidCatch(error: Error) {
+    diag.error('ui.error', { message: String(error) });
+  }
+
+  render() {
+    if (this.state.error) {
+      return (
+        <SafeAreaView style={[styles.safe, styles.center]}>
+          <Text style={{ fontWeight: '800', marginBottom: 8 }}>Algo salió mal</Text>
+          <Text style={{ textAlign: 'center', paddingHorizontal: 16 }}>{String(this.state.error.message)}</Text>
+          <Pressable
+            style={[styles.btn, { marginTop: 12, backgroundColor: '#0f82f8' }]}
+            onPress={() => this.setState({ error: null })}
+          >
+            <Text style={styles.btnText}>Reintentar</Text>
+          </Pressable>
+        </SafeAreaView>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 export default function App() {
+  const { height, width } = useWindowDimensions();
   const [bootStatus, setBootStatus] = useState<BootStatus>('booting');
   const [authStatus, setAuthStatus] = useState<AuthStatus>('guest');
   const [persistenceMode, setPersistenceMode] = useState<PersistenceMode>('local');
@@ -60,6 +118,7 @@ export default function App() {
   const lastPayloadRef = useRef<{ value: string; ts: number }>({ value: '', ts: 0 });
 
   const [cameraPermission, requestCameraPermission] = useCameraPermissions();
+  const isCompactLayout = width < 390 || height < 780;
 
   const palette = useMemo(() => {
     const base = themes[(settings.theme || 'dark') as ThemeName] || themes.dark;
@@ -68,17 +127,18 @@ export default function App() {
 
   useEffect(() => {
     (async () => {
+      const timeoutMs = 6000;
+      const timeout = new Promise<never>((_, reject) => setTimeout(() => reject(new Error('boot-timeout')), timeoutMs));
       try {
-        const [loadedSettings, loadedHistory, loadedTemplates] = await Promise.all([
-          loadSettings(),
-          loadHistory(),
-          loadTemplates(),
+        const [loadedSettings, loadedHistory, loadedTemplates] = await Promise.race([
+          Promise.all([loadSettings(), loadHistory(), loadTemplates()]),
+          timeout,
         ]);
-        setSettings(loadedSettings);
-        setHistory(loadedHistory);
-        setTemplates(loadedTemplates);
+        setSettings(loadedSettings || defaultSettings);
+        setHistory(loadedHistory || []);
+        setTemplates(loadedTemplates || []);
 
-        const rt = await initFirebaseRuntime();
+        const rt = await Promise.race([initFirebaseRuntime(), timeout]);
         setFirebaseConfigured(rt.enabled);
         setPersistenceMode(rt.enabled ? 'firebase' : 'local');
         setAuthStatus(rt.enabled ? 'unknown' : 'guest');
@@ -87,7 +147,14 @@ export default function App() {
         setBootStatus('ready');
       } catch (error) {
         await diag.error('boot.error', { message: String(error) });
-        setBootStatus('error');
+        // En móviles lentos preferimos levantar en modo local aun si falla boot.
+        setSettings(defaultSettings);
+        setHistory([]);
+        setTemplates([]);
+        setFirebaseConfigured(false);
+        setPersistenceMode('local');
+        setAuthStatus('guest');
+        setBootStatus('ready');
       }
     })();
   }, []);
@@ -181,6 +248,11 @@ export default function App() {
   }
 
   async function scanFromImage() {
+    if (Platform.OS === 'web') {
+      Alert.alert('Web', 'El escaneo desde imagen no está soportado en web todavía.');
+      return;
+    }
+
     const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 1 });
     if (res.canceled || !res.assets[0]?.uri) return;
 
@@ -202,6 +274,17 @@ export default function App() {
     const rows = history.map((h) => [h.id, h.codeNormalized, h.type, h.profileId, h.piMode, h.source, h.date, h.status, h.used, JSON.stringify(h.structuredFields)]
       .map((v) => `"${String(v).replace(/"/g, '""')}"`).join(','));
     const csv = [header, ...rows].join('\n');
+
+    if (Platform.OS === 'web') {
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `barra_export_${Date.now()}.csv`;
+      link.click();
+      return;
+    }
+
     const path = `${FileSystem.cacheDirectory}barra_export_${Date.now()}.csv`;
     await FileSystem.writeAsStringAsync(path, csv);
     await Sharing.shareAsync(path, { mimeType: 'text/csv' });
@@ -214,6 +297,17 @@ export default function App() {
   }
 
   async function exportLogs() {
+    if (Platform.OS === 'web') {
+      const json = await diag.getJson();
+      const blob = new Blob([json], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `barra_logs_${Date.now()}.json`;
+      link.click();
+      return;
+    }
+
     const path = `${FileSystem.cacheDirectory}barra_logs_${Date.now()}.json`;
     await FileSystem.writeAsStringAsync(path, await diag.getJson());
     await Sharing.shareAsync(path, { mimeType: 'application/json' });
@@ -335,21 +429,36 @@ export default function App() {
       ? `Firebase (${firebaseUser?.email || 'user'})`
       : 'Firebase guest';
 
-  return (
+  function tabIcon(tab: Tab, active: boolean) {
+    const color = active ? palette.accent : palette.muted;
+    if (tab === 'scan') return <Ionicons name="scan" size={18} color={color} />;
+    if (tab === 'history') return <Ionicons name="time-outline" size={18} color={color} />;
+    return <Ionicons name="settings-outline" size={18} color={color} />;
+  }
+
+  const content = (
     <SafeAreaView style={[styles.safe, { backgroundColor: palette.bg }]}> 
       <StatusBar barStyle={palette.bg === '#f6f8fc' ? 'dark-content' : 'light-content'} />
 
       <View style={[styles.header, { backgroundColor: palette.card, borderColor: palette.border }]}> 
-        <View>
-          <Text style={[styles.title, { color: palette.fg }]}>Barra Scanner RN</Text>
-          <Text style={[styles.subtitle, { color: palette.muted }]}>{statusChip}</Text>
+        <View style={styles.brandBlock}>
+          <LogoMark accent={palette.accent} foreground={palette.bg === '#f6f8fc' ? '#132033' : '#0f1218'} compact={isCompactLayout} />
+          <View>
+            <Text style={[styles.kicker, { color: palette.accent }]}>BARRA CORE</Text>
+            <Text style={[styles.title, { color: palette.fg }]}>Barra Scanner RN</Text>
+            <Text style={[styles.subtitle, { color: palette.muted }]}>{statusChip}</Text>
+          </View>
         </View>
         <View style={[styles.badge, { backgroundColor: palette.accent + '33', borderColor: palette.accent }]}>
           <Text style={[styles.badgeText, { color: palette.fg }]}>{settings.autoDetect ? 'AUTO' : settings.scanProfile.toUpperCase()}</Text>
         </View>
       </View>
 
-      <View style={styles.content}>
+      <KeyboardAvoidingView
+        style={styles.content}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        keyboardVerticalOffset={isCompactLayout ? 6 : 0}
+      >
         {bootStatus !== 'ready' ? (
           <View style={styles.center}><Text style={{ color: palette.fg }}>{bootStatus === 'booting' ? 'Cargando...' : 'Error de arranque'}</Text></View>
         ) : activeTab === 'scan' ? (
@@ -357,23 +466,36 @@ export default function App() {
             {!cameraPermission?.granted ? (
               <View style={styles.center}>
                 <Text style={{ color: palette.fg, marginBottom: 12 }}>Permiso de camara requerido</Text>
-                <Pressable style={[styles.btn, { backgroundColor: palette.accent }]} onPress={() => requestCameraPermission()}>
-                  <Text style={styles.btnText}>Permitir camara</Text>
+                <Pressable style={[styles.btn, styles.actionBtn, { backgroundColor: palette.accent }]} onPress={() => requestCameraPermission()}>
+                  <View style={styles.btnContent}>
+                    <Ionicons name="camera-outline" size={18} color="#fff" />
+                    <Text style={styles.btnText}>Permitir camara</Text>
+                  </View>
                 </Pressable>
               </View>
             ) : (
               <CameraView
-                style={[styles.camera, { borderColor: palette.border }]}
+                style={[
+                  styles.camera,
+                  isCompactLayout ? styles.cameraCompact : null,
+                  { borderColor: palette.border },
+                ]}
                 barcodeScannerSettings={{ barcodeTypes: ['qr', 'code128', 'code39', 'ean13', 'ean8'] }}
                 onBarcodeScanned={(event) => onBarCodeScanned(event.data)}
               />
             )}
             <View style={styles.rowButtons}>
-              <Pressable style={[styles.btn, { backgroundColor: palette.card, borderColor: palette.border }]} onPress={scanFromImage}>
-                <Text style={[styles.btnText, { color: palette.fg }]}>Image scan</Text>
+              <Pressable style={[styles.btn, styles.actionBtn, { backgroundColor: palette.card, borderColor: palette.border }]} onPress={scanFromImage}>
+                <View style={styles.btnContent}>
+                  <Ionicons name="images-outline" size={18} color={palette.fg} />
+                  <Text style={[styles.btnText, { color: palette.fg }]}>Image scan</Text>
+                </View>
               </Pressable>
-              <Pressable style={[styles.btn, { backgroundColor: palette.card, borderColor: palette.border }]} onPress={() => Alert.alert('NFC', 'NFC no disponible en Expo managed por defecto')}>
-                <Text style={[styles.btnText, { color: palette.fg }]}>NFC</Text>
+              <Pressable style={[styles.btn, styles.actionBtn, { backgroundColor: palette.card, borderColor: palette.border }]} onPress={() => Alert.alert('NFC', 'NFC no disponible en Expo managed por defecto')}>
+                <View style={styles.btnContent}>
+                  <MaterialCommunityIcons name="nfc-variant" size={18} color={palette.fg} />
+                  <Text style={[styles.btnText, { color: palette.fg }]}>NFC</Text>
+                </View>
               </Pressable>
             </View>
           </View>
@@ -389,6 +511,12 @@ export default function App() {
             <FlatList
               data={filteredHistory()}
               keyExtractor={(item) => item.id}
+              contentContainerStyle={styles.listContent}
+              ListEmptyComponent={
+                <View style={[styles.card, { backgroundColor: palette.card, borderColor: palette.border }]}>
+                  <Text style={{ color: palette.fg }}>No hay escaneos todavia.</Text>
+                </View>
+              }
               renderItem={({ item }) => (
                 <View style={[styles.card, { backgroundColor: palette.card, borderColor: palette.border }]}> 
                   <Text style={[styles.code, { color: palette.fg }]}>{item.codeNormalized}</Text>
@@ -396,12 +524,18 @@ export default function App() {
                   <Text style={{ color: palette.muted }}>Source: {item.source}</Text>
                   <View style={styles.rowButtons}>
                     {!item.used && (
-                      <Pressable style={[styles.smallBtn, { borderColor: palette.border }]} onPress={() => markUsed(item.id)}>
-                        <Text style={{ color: palette.fg }}>Mark used</Text>
+                      <Pressable style={[styles.smallBtn, styles.actionBtn, { borderColor: palette.border }]} onPress={() => markUsed(item.id)}>
+                        <View style={styles.inlineAction}>
+                          <Ionicons name="checkmark-done-outline" size={16} color={palette.fg} />
+                          <Text style={{ color: palette.fg }}>Mark used</Text>
+                        </View>
                       </Pressable>
                     )}
-                    <Pressable style={[styles.smallBtn, { borderColor: palette.border }]} onPress={() => saveTemplateFromItem(item)}>
-                      <Text style={{ color: palette.fg }}>Save template</Text>
+                    <Pressable style={[styles.smallBtn, styles.actionBtn, { borderColor: palette.border }]} onPress={() => saveTemplateFromItem(item)}>
+                      <View style={styles.inlineAction}>
+                        <Ionicons name="bookmark-outline" size={16} color={palette.fg} />
+                        <Text style={{ color: palette.fg }}>Save template</Text>
+                      </View>
                     </Pressable>
                   </View>
                 </View>
@@ -409,15 +543,19 @@ export default function App() {
             />
           </View>
         ) : (
-          <View style={styles.screen}>
+          <ScrollView
+            style={styles.screen}
+            contentContainerStyle={styles.settingsContent}
+            keyboardShouldPersistTaps="handled"
+          >
             <View style={[styles.card, { backgroundColor: palette.card, borderColor: palette.border }]}> 
               <Text style={[styles.sectionTitle, { color: palette.fg }]}>Auto Detect</Text>
               <Switch value={settings.autoDetect} onValueChange={(v) => patchSettings({ autoDetect: v, scanProfile: v ? 'auto' : settings.scanProfile })} />
               <Text style={[styles.sectionTitle, { color: palette.fg, marginTop: 12 }]}>Theme</Text>
               <View style={styles.rowButtons}>
-                <Pressable style={[styles.smallBtn, { borderColor: palette.border }]} onPress={() => patchSettings({ theme: 'dark' })}><Text style={{ color: palette.fg }}>Dark</Text></Pressable>
-                <Pressable style={[styles.smallBtn, { borderColor: palette.border }]} onPress={() => patchSettings({ theme: 'light' })}><Text style={{ color: palette.fg }}>Light</Text></Pressable>
-                <Pressable style={[styles.smallBtn, { borderColor: palette.border }]} onPress={() => patchSettings({ theme: 'eu_blue' })}><Text style={{ color: palette.fg }}>EU Blue</Text></Pressable>
+                <Pressable style={[styles.smallBtn, styles.actionBtn, { borderColor: palette.border }]} onPress={() => patchSettings({ theme: 'dark' })}><Text style={{ color: palette.fg }}>Dark</Text></Pressable>
+                <Pressable style={[styles.smallBtn, styles.actionBtn, { borderColor: palette.border }]} onPress={() => patchSettings({ theme: 'light' })}><Text style={{ color: palette.fg }}>Light</Text></Pressable>
+                <Pressable style={[styles.smallBtn, styles.actionBtn, { borderColor: palette.border }]} onPress={() => patchSettings({ theme: 'eu_blue' })}><Text style={{ color: palette.fg }}>EU Blue</Text></Pressable>
               </View>
               <TextInput
                 value={settings.serviceNowBaseUrl}
@@ -431,19 +569,45 @@ export default function App() {
                 onChangeText={setPasteText}
                 placeholder="Paste ticket text"
                 multiline
+                textAlignVertical="top"
                 placeholderTextColor={palette.muted}
-                style={[styles.input, { color: palette.fg, borderColor: palette.border, backgroundColor: palette.bg, minHeight: 90 }]}
+                style={[styles.input, styles.pasteInput, { color: palette.fg, borderColor: palette.border, backgroundColor: palette.bg }]}
               />
               <View style={styles.rowButtons}>
-                <Pressable style={[styles.btn, { backgroundColor: palette.accent }]} onPress={() => persistScan(pasteText, 'paste')}><Text style={styles.btnText}>Process paste</Text></Pressable>
+                <Pressable style={[styles.btn, styles.actionBtn, { backgroundColor: palette.accent }]} onPress={() => persistScan(pasteText, 'paste')}>
+                  <View style={styles.btnContent}>
+                    <Ionicons name="sparkles-outline" size={18} color="#fff" />
+                    <Text style={styles.btnText}>Process paste</Text>
+                  </View>
+                </Pressable>
               </View>
               <View style={styles.rowButtons}>
-                <Pressable style={[styles.smallBtn, { borderColor: palette.border }]} onPress={exportCsv}><Text style={{ color: palette.fg }}>Export CSV</Text></Pressable>
-                <Pressable style={[styles.smallBtn, { borderColor: palette.border }]} onPress={clearAllHistory}><Text style={{ color: palette.fg }}>Clear history</Text></Pressable>
+                <Pressable style={[styles.smallBtn, styles.actionBtn, { borderColor: palette.border }]} onPress={exportCsv}>
+                  <View style={styles.inlineAction}>
+                    <Ionicons name="download-outline" size={16} color={palette.fg} />
+                    <Text style={{ color: palette.fg }}>Export CSV</Text>
+                  </View>
+                </Pressable>
+                <Pressable style={[styles.smallBtn, styles.actionBtn, { borderColor: palette.border }]} onPress={clearAllHistory}>
+                  <View style={styles.inlineAction}>
+                    <Ionicons name="trash-outline" size={16} color={palette.fg} />
+                    <Text style={{ color: palette.fg }}>Clear history</Text>
+                  </View>
+                </Pressable>
               </View>
               <View style={styles.rowButtons}>
-                <Pressable style={[styles.smallBtn, { borderColor: palette.border }]} onPress={copyLogs}><Text style={{ color: palette.fg }}>Copy logs</Text></Pressable>
-                <Pressable style={[styles.smallBtn, { borderColor: palette.border }]} onPress={exportLogs}><Text style={{ color: palette.fg }}>Export logs</Text></Pressable>
+                <Pressable style={[styles.smallBtn, styles.actionBtn, { borderColor: palette.border }]} onPress={copyLogs}>
+                  <View style={styles.inlineAction}>
+                    <Ionicons name="copy-outline" size={16} color={palette.fg} />
+                    <Text style={{ color: palette.fg }}>Copy logs</Text>
+                  </View>
+                </Pressable>
+                <Pressable style={[styles.smallBtn, styles.actionBtn, { borderColor: palette.border }]} onPress={exportLogs}>
+                  <View style={styles.inlineAction}>
+                    <Ionicons name="document-text-outline" size={16} color={palette.fg} />
+                    <Text style={{ color: palette.fg }}>Export logs</Text>
+                  </View>
+                </Pressable>
               </View>
 
               <Text style={[styles.sectionTitle, { color: palette.fg, marginTop: 12 }]}>Firebase</Text>
@@ -453,8 +617,11 @@ export default function App() {
                     No configurado. Define EXPO_PUBLIC_FIREBASE_* para habilitar sync cloud.
                   </Text>
                   <View style={styles.rowButtons}>
-                    <Pressable style={[styles.smallBtn, { borderColor: palette.border }]} onPress={recheckFirebase}>
-                      <Text style={{ color: palette.fg }}>Recheck</Text>
+                    <Pressable style={[styles.smallBtn, styles.actionBtn, { borderColor: palette.border }]} onPress={recheckFirebase}>
+                      <View style={styles.inlineAction}>
+                        <Ionicons name="refresh-outline" size={16} color={palette.fg} />
+                        <Text style={{ color: palette.fg }}>Recheck</Text>
+                      </View>
                     </Pressable>
                   </View>
                 </>
@@ -479,40 +646,63 @@ export default function App() {
                   />
                   <View style={styles.rowButtons}>
                     {authStatus !== 'authenticated' ? (
-                      <Pressable style={[styles.smallBtn, { borderColor: palette.border, opacity: authBusy ? 0.6 : 1 }]} onPress={doFirebaseLogin} disabled={authBusy}>
-                        <Text style={{ color: palette.fg }}>{authBusy ? 'Working...' : 'Login/Create'}</Text>
+                      <Pressable style={[styles.smallBtn, styles.actionBtn, { borderColor: palette.border, opacity: authBusy ? 0.6 : 1 }]} onPress={doFirebaseLogin} disabled={authBusy}>
+                        <View style={styles.inlineAction}>
+                          <Ionicons name="log-in-outline" size={16} color={palette.fg} />
+                          <Text style={{ color: palette.fg }}>{authBusy ? 'Working...' : 'Login/Create'}</Text>
+                        </View>
                       </Pressable>
                     ) : (
-                      <Pressable style={[styles.smallBtn, { borderColor: palette.border, opacity: authBusy ? 0.6 : 1 }]} onPress={doFirebaseLogout} disabled={authBusy}>
-                        <Text style={{ color: palette.fg }}>{authBusy ? 'Working...' : 'Logout'}</Text>
+                      <Pressable style={[styles.smallBtn, styles.actionBtn, { borderColor: palette.border, opacity: authBusy ? 0.6 : 1 }]} onPress={doFirebaseLogout} disabled={authBusy}>
+                        <View style={styles.inlineAction}>
+                          <Ionicons name="log-out-outline" size={16} color={palette.fg} />
+                          <Text style={{ color: palette.fg }}>{authBusy ? 'Working...' : 'Logout'}</Text>
+                        </View>
                       </Pressable>
                     )}
                     <Pressable
-                      style={[styles.smallBtn, { borderColor: palette.border, opacity: authStatus === 'authenticated' && !syncBusy ? 1 : 0.5 }]}
+                      style={[styles.smallBtn, styles.actionBtn, { borderColor: palette.border, opacity: authStatus === 'authenticated' && !syncBusy ? 1 : 0.5 }]}
                       disabled={authStatus !== 'authenticated' || syncBusy}
                       onPress={syncNow}
                     >
-                      <Text style={{ color: palette.fg }}>{syncBusy ? 'Syncing...' : 'Sync now'}</Text>
+                      <View style={styles.inlineAction}>
+                        <Ionicons name="cloud-upload-outline" size={16} color={palette.fg} />
+                        <Text style={{ color: palette.fg }}>{syncBusy ? 'Syncing...' : 'Sync now'}</Text>
+                      </View>
                     </Pressable>
-                    <Pressable style={[styles.smallBtn, { borderColor: palette.border }]} onPress={recheckFirebase}>
-                      <Text style={{ color: palette.fg }}>Recheck</Text>
+                    <Pressable style={[styles.smallBtn, styles.actionBtn, { borderColor: palette.border }]} onPress={recheckFirebase}>
+                      <View style={styles.inlineAction}>
+                        <Ionicons name="refresh-outline" size={16} color={palette.fg} />
+                        <Text style={{ color: palette.fg }}>Recheck</Text>
+                      </View>
                     </Pressable>
                   </View>
                 </>
               )}
             </View>
-          </View>
+          </ScrollView>
         )}
-      </View>
+      </KeyboardAvoidingView>
 
       <View style={[styles.footer, { backgroundColor: palette.card, borderColor: palette.border }]}> 
         {(['scan', 'history', 'settings'] as Tab[]).map((tab) => (
           <Pressable key={tab} onPress={() => setActiveTab(tab)} style={styles.footerBtn}>
-            <Text style={{ color: activeTab === tab ? palette.accent : palette.muted, fontWeight: '700' }}>{tab.toUpperCase()}</Text>
+            <View style={styles.footerBtnInner}>
+              {tabIcon(tab, activeTab === tab)}
+              <Text style={{ color: activeTab === tab ? palette.accent : palette.muted, fontWeight: '700' }}>{tab.toUpperCase()}</Text>
+            </View>
           </Pressable>
         ))}
       </View>
     </SafeAreaView>
+  );
+
+  return (
+    <SimpleErrorBoundary>
+      <SafeAreaProvider>
+        {content}
+      </SafeAreaProvider>
+    </SimpleErrorBoundary>
   );
 }
 
@@ -526,22 +716,58 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
   },
+  brandBlock: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
+  kicker: { fontSize: 10, fontWeight: '900', letterSpacing: 1.8, marginBottom: 2 },
   title: { fontSize: 18, fontWeight: '800' },
   subtitle: { fontSize: 12, marginTop: 2 },
   badge: { borderWidth: 1, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 5 },
   badgeText: { fontSize: 12, fontWeight: '800' },
+  logoShell: {
+    borderWidth: 1,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  logoHalo: {
+    position: 'absolute',
+    width: '100%',
+    height: '100%',
+    borderRadius: 18,
+    transform: [{ rotate: '12deg' }],
+  },
+  logoCore: {
+    width: '72%',
+    height: '72%',
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    transform: [{ rotate: '-8deg' }],
+  },
+  logoBars: { flexDirection: 'row', alignItems: 'flex-end', gap: 3 },
+  logoBar: { width: 4, borderRadius: 99 },
+  logoBarThin: { width: 2, borderRadius: 99, opacity: 0.9 },
   content: { flex: 1 },
   screen: { flex: 1, padding: 12, gap: 10 },
+  settingsContent: { paddingBottom: 24 },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   camera: { flex: 1, borderWidth: 1, borderRadius: 16, overflow: 'hidden' },
+  cameraCompact: { minHeight: 260 },
   rowButtons: { flexDirection: 'row', gap: 8, marginTop: 8, flexWrap: 'wrap' },
   btn: { paddingHorizontal: 14, paddingVertical: 10, borderRadius: 10, borderWidth: 1, borderColor: 'transparent' },
+  btnContent: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
   btnText: { color: '#fff', fontWeight: '700' },
   smallBtn: { borderWidth: 1, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 8 },
+  actionBtn: { minWidth: 120 },
+  inlineAction: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   input: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 10, marginTop: 10 },
+  pasteInput: { minHeight: 110 },
   card: { borderWidth: 1, borderRadius: 12, padding: 12, marginBottom: 10 },
+  listContent: { paddingBottom: 18 },
   code: { fontSize: 16, fontWeight: '800', marginBottom: 4 },
   sectionTitle: { fontSize: 14, fontWeight: '700' },
   footer: { borderTopWidth: 1, paddingHorizontal: 8, paddingVertical: 8, flexDirection: 'row' },
   footerBtn: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 8 },
+  footerBtnInner: { alignItems: 'center', justifyContent: 'center', gap: 5 },
 });
