@@ -33,4 +33,3 @@ export function extractFields(rawText: string, templates: TemplateRule[]): Recor
 
   return Object.fromEntries(Object.entries(defaults).filter(([, v]) => !!v));
 }
-

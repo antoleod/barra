@@ -38,4 +38,3 @@ export interface ScanRecord {
   used: boolean;
   dateUsed: string | null;
 }
-

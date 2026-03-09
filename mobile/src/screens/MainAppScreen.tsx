@@ -1,8 +1,8 @@
-﻿﻿﻿﻿import React from 'react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+﻿﻿import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   FlatList,
+  Modal,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -14,6 +14,7 @@ import {
   TextInput,
   useWindowDimensions,
   View,
+  Vibration,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { CameraView, Camera, useCameraPermissions } from 'expo-camera';
@@ -22,6 +23,7 @@ import * as Clipboard from 'expo-clipboard';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Audio } from 'expo-av';
 
 import { AppSettings, BootStatus, PersistenceMode, ScanRecord, TemplateRule } from '../types';
 import { defaultSettings, loadSettings, piLogic, saveSettings } from '../core/settings';
@@ -37,6 +39,7 @@ import {
   syncScansWithFirebase,
 } from '../core/firebase';
 import { useAuth } from '../auth/useAuth';
+import QRCode from 'react-native-qrcode-svg';
 
 type Tab = 'scan' | 'history' | 'settings';
 
@@ -103,7 +106,12 @@ function MainApp() {
   const [query, setQuery] = useState('');
   const [lastScanAt, setLastScanAt] = useState(0);
   const [pasteText, setPasteText] = useState('');
+  const [filterType, setFilterType] = useState('ALL');
+  const [dateFilter, setDateFilter] = useState<'ALL' | 'TODAY' | 'WEEK' | 'MONTH'>('ALL');
 
+  const [selection, setSelection] = useState<Set<string>>(new Set());
+  const [qrModalVisible, setQrModalVisible] = useState(false);
+  const [qrData, setQrData] = useState('');
   const [syncBusy, setSyncBusy] = useState(false);
 
   const scanBusyRef = useRef(false);
@@ -153,6 +161,55 @@ function MainApp() {
     await saveSettings(merged);
   }
 
+  function toggleSelection(id: string) {
+    const next = new Set(selection);
+    if (next.has(id)) {
+      next.delete(id);
+    } else {
+      next.add(id);
+    }
+    setSelection(next);
+  }
+
+  function handleLongPress(id: string) {
+    if (selection.size === 0) {
+      toggleSelection(id);
+    }
+  }
+
+  async function handleShare() {
+    const itemsToShare = history.filter((item) => selection.has(item.id));
+    if (itemsToShare.length === 0) return;
+
+    const dataToShare = JSON.stringify(
+      itemsToShare.map((item) => ({ c: item.codeNormalized, t: item.type, d: item.date }))
+    );
+
+    Alert.alert(
+      'Share Selection',
+      `Share ${itemsToShare.length} item(s)`,
+      [
+        { text: 'Generate QR Code', onPress: () => showQrCode(dataToShare) },
+        { text: 'Share as Text', onPress: () => shareAsText(dataToShare) },
+        { text: 'Cancel', style: 'cancel' },
+      ]
+    );
+  }
+
+  async function shareAsText(text: string) {
+    try {
+      await Sharing.shareAsync(text);
+      setSelection(new Set());
+    } catch (error) {
+      Alert.alert('Share Error', String(error));
+    }
+  }
+
+  function showQrCode(data: string) {
+    setQrData(data);
+    setQrModalVisible(true);
+  }
+
   function classifyAndNormalize(raw: string) {
     if (settings.autoDetect || settings.scanProfile === 'auto') return classify(raw, settings);
     if (settings.scanProfile === 'pi_full') {
@@ -164,6 +221,16 @@ function MainApp() {
       return { profileId: 'pi_short', type: 'PI' as const, normalized, piMode: 'SHORT' as const };
     }
     return classify(raw, settings);
+  }
+
+  async function playScanSound() {
+    try {
+      // Ensure you have a beep.mp3 in your assets folder
+      const { sound } = await Audio.Sound.createAsync(require('../../assets/beep.mp3'));
+      await sound.playAsync();
+    } catch (error) {
+      // Fail silently if sound file is missing
+    }
   }
 
   async function persistScan(raw: string, source: ScanRecord['source']) {
@@ -180,6 +247,8 @@ function MainApp() {
 
       if (now - lastScanAt < 1000) return;
       setLastScanAt(now);
+      Vibration.vibrate();
+      playScanSound();
 
       const classified = classifyAndNormalize(payload);
       if (!classified.normalized) return;
@@ -218,7 +287,81 @@ function MainApp() {
     }
   }
 
+  async function handleImportScan(json: string): Promise<boolean> {
+    try {
+      const parsed = JSON.parse(json);
+      if (!Array.isArray(parsed)) return false;
+      // Verificamos que tenga la estructura de exportación: [{ c: 'code', t: 'type', ... }]
+      const isImport = parsed.length > 0 && parsed[0].c && parsed[0].t;
+      if (!isImport) return false;
+
+      if (scanBusyRef.current) return true;
+      scanBusyRef.current = true;
+
+      Alert.alert(
+        'Importar Escaneos',
+        `El QR contiene ${parsed.length} elementos. ¿Deseas importarlos?`,
+        [
+          {
+            text: 'Cancelar',
+            style: 'cancel',
+            onPress: () => {
+              scanBusyRef.current = false;
+              // Evitamos que se vuelva a escanear inmediatamente el mismo QR
+              lastPayloadRef.current = { value: json, ts: Date.now() };
+            },
+          },
+          {
+            text: 'Importar',
+            onPress: async () => {
+              try {
+                let imported = 0;
+                for (const item of parsed) {
+                  // Evitamos duplicados exactos
+                  if (!history.some((h) => h.codeNormalized === item.c && h.type === item.t)) {
+                    const record: ScanRecord = {
+                      id: `imp_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+                      codeOriginal: item.c,
+                      codeNormalized: item.c,
+                      type: item.t,
+                      profileId: 'import',
+                      piMode: 'N/A',
+                      source: 'import',
+                      structuredFields: {},
+                      date: item.d || new Date().toISOString(),
+                      status: 'pending',
+                      used: false,
+                      dateUsed: null,
+                    };
+                    await addHistory(record);
+                    imported++;
+                  }
+                }
+                const nextHistory = await loadHistory();
+                setHistory(nextHistory);
+                Alert.alert('Importación Exitosa', `Se importaron ${imported} nuevos elementos.`);
+              } catch (e) {
+                Alert.alert('Error de Importación', String(e));
+              } finally {
+                scanBusyRef.current = false;
+                lastPayloadRef.current = { value: json, ts: Date.now() };
+              }
+            },
+          },
+        ]
+      );
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   async function onBarCodeScanned(data: string) {
+    // Intentamos detectar si es un QR de importación primero
+    if (data.startsWith('[') && (data.includes('"c":') || data.includes('"t":'))) {
+      const handled = await handleImportScan(data);
+      if (handled) return;
+    }
     await persistScan(data, 'camera');
   }
 
@@ -357,10 +500,26 @@ function MainApp() {
   }
 
   function filteredHistory() {
-    return history.filter((x) =>
-      x.codeNormalized.toLowerCase().includes(query.toLowerCase()) ||
-      x.type.toLowerCase().includes(query.toLowerCase())
-    );
+    return history.filter((x) => {
+      const matchesQuery = x.codeNormalized.toLowerCase().includes(query.toLowerCase()) ||
+        x.type.toLowerCase().includes(query.toLowerCase());
+      const matchesType = filterType === 'ALL' || x.type === filterType;
+
+      let matchesDate = true;
+      if (dateFilter !== 'ALL') {
+        const date = new Date(x.date);
+        const now = new Date();
+        if (dateFilter === 'TODAY') {
+          matchesDate = date.toDateString() === now.toDateString();
+        } else if (dateFilter === 'WEEK') {
+          matchesDate = date.getTime() > now.getTime() - 7 * 24 * 60 * 60 * 1000;
+        } else if (dateFilter === 'MONTH') {
+          matchesDate = date.getTime() > now.getTime() - 30 * 24 * 60 * 60 * 1000;
+        }
+      }
+
+      return matchesQuery && matchesType && matchesDate;
+    });
   }
 
   const statusChip = persistenceMode === 'local'
@@ -450,6 +609,28 @@ function MainApp() {
               placeholderTextColor={palette.muted}
               style={[styles.input, { color: palette.fg, borderColor: palette.border, backgroundColor: palette.card }]}
             />
+            <View style={styles.filterRow}>
+              {['ALL', 'PI', 'RITM', 'QR'].map((t) => (
+                <Pressable
+                  key={t}
+                  style={[styles.filterChip, filterType === t ? { backgroundColor: palette.accent } : { borderColor: palette.border, borderWidth: 1 }]}
+                  onPress={() => setFilterType(t)}
+                >
+                  <Text style={{ color: filterType === t ? '#fff' : palette.fg, fontSize: 12, fontWeight: '700' }}>{t}</Text>
+                </Pressable>
+              ))}
+            </View>
+            <View style={styles.filterRow}>
+              {['ALL', 'TODAY', 'WEEK', 'MONTH'].map((d) => (
+                <Pressable
+                  key={d}
+                  style={[styles.filterChip, dateFilter === d ? { backgroundColor: palette.accent } : { borderColor: palette.border, borderWidth: 1 }]}
+                  onPress={() => setDateFilter(d as any)}
+                >
+                  <Text style={{ color: dateFilter === d ? '#fff' : palette.fg, fontSize: 12, fontWeight: '700' }}>{d}</Text>
+                </Pressable>
+              ))}
+            </View>
             <FlatList
               data={filteredHistory()}
               keyExtractor={(item) => item.id}
@@ -459,29 +640,38 @@ function MainApp() {
                   <Text style={{ color: palette.fg }}>No scans yet.</Text>
                 </View>
               }
-              renderItem={({ item }) => (
-                <View style={[styles.card, { backgroundColor: palette.card, borderColor: palette.border }]}> 
-                  <Text style={[styles.code, { color: palette.fg }]}>{item.codeNormalized}</Text>
-                  <Text style={{ color: palette.muted }}>{item.type} • {new Date(item.date).toLocaleString()}</Text>
-                  <Text style={{ color: palette.muted }}>Source: {item.source}</Text>
-                  <View style={styles.rowButtons}>
-                    {!item.used && (
-                      <Pressable style={[styles.smallBtn, styles.actionBtn, { borderColor: palette.border }]} onPress={() => markUsed(item.id)}>
-                        <View style={styles.inlineAction}>
-                          <Ionicons name="checkmark-done-outline" size={16} color={palette.fg} />
-                          <Text style={{ color: palette.fg }}>Mark used</Text>
-                        </View>
-                      </Pressable>
-                    )}
-                    <Pressable style={[styles.smallBtn, styles.actionBtn, { borderColor: palette.border }]} onPress={() => saveTemplateFromItem(item)}>
-                      <View style={styles.inlineAction}>
-                        <Ionicons name="bookmark-outline" size={16} color={palette.fg} />
-                        <Text style={{ color: palette.fg }}>Save template</Text>
+              renderItem={({ item }) => {
+                const isSelected = selection.has(item.id);
+                return (
+                  <Pressable
+                    onPress={() => selection.size > 0 && toggleSelection(item.id)}
+                    onLongPress={() => handleLongPress(item.id)}
+                    style={({ pressed }) => ({ opacity: pressed ? 0.8 : 1 })}
+                  >
+                    <View style={[styles.card, { backgroundColor: palette.card, borderColor: palette.border }, isSelected && { borderColor: palette.accent, borderWidth: 2 }]}>
+                      <Text style={[styles.code, { color: palette.fg }]}>{item.codeNormalized}</Text>
+                      <Text style={{ color: palette.muted }}>{item.type} • {new Date(item.date).toLocaleString()}</Text>
+                      <Text style={{ color: palette.muted }}>Source: {item.source}</Text>
+                      <View style={styles.rowButtons}>
+                        {!item.used && (
+                          <Pressable style={[styles.smallBtn, styles.actionBtn, { borderColor: palette.border }]} onPress={() => markUsed(item.id)}>
+                            <View style={styles.inlineAction}>
+                              <Ionicons name="checkmark-done-outline" size={16} color={palette.fg} />
+                              <Text style={{ color: palette.fg }}>Mark used</Text>
+                            </View>
+                          </Pressable>
+                        )}
+                        <Pressable style={[styles.smallBtn, styles.actionBtn, { borderColor: palette.border }]} onPress={() => saveTemplateFromItem(item)}>
+                          <View style={styles.inlineAction}>
+                            <Ionicons name="bookmark-outline" size={16} color={palette.fg} />
+                            <Text style={{ color: palette.fg }}>Save template</Text>
+                          </View>
+                        </Pressable>
                       </View>
-                    </Pressable>
-                  </View>
-                </View>
-              )}
+                    </View>
+                  </Pressable>
+                );
+              }}
             />
           </View>
         ) : (
@@ -592,16 +782,49 @@ function MainApp() {
         )}
       </KeyboardAvoidingView>
 
-      <View style={[styles.footer, { backgroundColor: palette.card, borderColor: palette.border }]}> 
-        {(['scan', 'history', 'settings'] as Tab[]).map((tab) => (
-          <Pressable key={tab} onPress={() => setActiveTab(tab)} style={styles.footerBtn}>
-            <View style={styles.footerBtnInner}>
-              {tabIcon(tab, activeTab === tab)}
-              <Text style={{ color: activeTab === tab ? palette.accent : palette.muted, fontWeight: '700' }}>{tab.toUpperCase()}</Text>
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={qrModalVisible}
+        onRequestClose={() => setQrModalVisible(false)}
+      >
+        <Pressable style={styles.modalBackdrop} onPress={() => setQrModalVisible(false)}>
+          <View style={[styles.modalView, { backgroundColor: palette.card }]}>
+            <View style={styles.qrContainer}>
+              <QRCode
+                value={qrData}
+                size={width * 0.7}
+                backgroundColor="white"
+                color="black"
+              />
             </View>
+            <Text style={{ color: palette.muted, marginTop: 16, fontSize: 12 }}>Scan this code to import</Text>
+          </View>
+        </Pressable>
+      </Modal>
+
+      {selection.size > 0 ? (
+        <View style={[styles.selectionFooter, { backgroundColor: palette.card, borderColor: palette.border }]}>
+          <Pressable onPress={() => setSelection(new Set())} style={styles.selectionBtn}>
+            <Ionicons name="close" size={24} color={palette.fg} />
           </Pressable>
-        ))}
-      </View>
+          <Text style={{ color: palette.fg, fontWeight: '700' }}>{selection.size} selected</Text>
+          <Pressable onPress={handleShare} style={styles.selectionBtn}>
+            <Ionicons name="share-outline" size={24} color={palette.accent} />
+          </Pressable>
+        </View>
+      ) : (
+        <View style={[styles.footer, { backgroundColor: palette.card, borderColor: palette.border }]}>
+          {(['scan', 'history', 'settings'] as Tab[]).map((tab) => (
+            <Pressable key={tab} onPress={() => setActiveTab(tab)} style={styles.footerBtn}>
+              <View style={styles.footerBtnInner}>
+                {tabIcon(tab, activeTab === tab)}
+                <Text style={{ color: activeTab === tab ? palette.accent : palette.muted, fontWeight: '700' }}>{tab.toUpperCase()}</Text>
+              </View>
+            </Pressable>
+          ))}
+        </View>
+      )}
     </SafeAreaView>
   );
 
@@ -674,10 +897,45 @@ const styles = StyleSheet.create({
   input: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 10, marginTop: 10 },
   pasteInput: { minHeight: 110 },
   card: { borderWidth: 1, borderRadius: 12, padding: 12, marginBottom: 10 },
+  filterRow: { flexDirection: 'row', gap: 8, marginBottom: 4, marginTop: 10 },
+  filterChip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16 },
   listContent: { paddingBottom: 18 },
   code: { fontSize: 16, fontWeight: '800', marginBottom: 4 },
   sectionTitle: { fontSize: 14, fontWeight: '700' },
   footer: { borderTopWidth: 1, paddingHorizontal: 8, paddingVertical: 8, flexDirection: 'row' },
   footerBtn: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 8 },
   footerBtnInner: { alignItems: 'center', justifyContent: 'center', gap: 5 },
+  selectionFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+    borderTopWidth: 1,
+  },
+  selectionBtn: {
+    padding: 8,
+  },
+  modalBackdrop: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+  },
+  modalView: {
+    margin: 20,
+    borderRadius: 20,
+    padding: 25,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  qrContainer: {
+    padding: 16,
+    backgroundColor: 'white',
+    borderRadius: 8,
+  },
 });

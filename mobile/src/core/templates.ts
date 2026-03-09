@@ -34,4 +34,3 @@ export async function saveTemplate(template: Omit<TemplateRule, 'id' | 'createdA
   await AsyncStorage.setItem(KEY, JSON.stringify(next));
   return next;
 }
-
